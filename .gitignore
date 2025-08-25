@@ -7,3 +7,6 @@ Makefile
 install_manifest.txt
 CMakeCache.txt
 .idea/
+hamon
+.cmake/
+Testing/
