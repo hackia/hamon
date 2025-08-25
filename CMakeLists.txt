@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 4.0)
-project(kpack)
+project(hamon)
 
 set(CMAKE_CXX_STANDARD 26)
 
