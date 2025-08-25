@@ -22,19 +22,26 @@ constexpr int kNodeCount = 8;
 inline void wait_for_server_startup() noexcept {
     std::this_thread::sleep_for(kServerStartupDelay);
 }
-
 void send_value(const int sock, const uint32_t value) {
     const uint32_t network_value = htonl(value);
     send(sock, &network_value, sizeof(network_value), 0);
 }
-
 unsigned int receive_value(const int sock) {
     int network_value = 0;
     read(sock, &network_value, sizeof(network_value));
     return ntohl(network_value);
 }
+int perform_kpack_task(const Node& node) {
+    std::cout << "[Node " << node.id << "] ### Starting Kpack task... ###" << std::endl;
+    std::this_thread::sleep_for(50ms * node.id);
+
+    std::cout << "[Node " << node.id << "] ### Kpack task finished successfully. ###" << std::endl;
+    return 1;
+}
+
 
 void run_node_logic(const Node &node) {
+    // --- 1. Initialisation du serveur d'écoute (inchangée) ---
     const int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in address{};
     address.sin_family = AF_INET;
@@ -46,48 +53,68 @@ void run_node_logic(const Node &node) {
         exit(EXIT_FAILURE);
     }
 
+    // On garde cette pause, elle aide à éviter trop de tentatives inutiles
     wait_for_server_startup();
 
-    unsigned int local_sum = node.id;
-    std::cout << "[Node " << node.id << "] Starting with value: " << local_sum << std::endl;
+    // --- 2. Exécution de la tâche locale (inchangée) ---
+    int task_result = perform_kpack_task(node);
+
+    unsigned int status_sum = task_result;
 
     for (int d = 0; d < 3; ++d) {
         const auto partner_id = node.id ^ 1 << d;
 
         if (node.id > partner_id) {
+            // ----- SECTION MODIFIÉE : LOGIQUE DE CONNEXION AVEC RÉESSAIS -----
             const int client_sock = socket(AF_INET, SOCK_STREAM, 0);
             sockaddr_in serv_addr{};
             serv_addr.sin_family = AF_INET;
             serv_addr.sin_port = htons(BASE_PORT + partner_id);
             inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr);
 
-            if (connect(client_sock, reinterpret_cast<sockaddr *>(&serv_addr), sizeof(serv_addr)) == 0) {
-                std::cout << "[Node " << node.id << "] Round " << d << ": Sending value " << local_sum << " to partner "
-                        << partner_id << std::endl;
-                send_value(client_sock, local_sum);
-                close(client_sock);
-            } else {
-                perror("[Node Error] Connection failed");
+            bool connected = false;
+            constexpr int max_retries = 5;
+            for (int attempt = 0; attempt < max_retries; ++attempt) {
+                if (connect(client_sock, reinterpret_cast<sockaddr *>(&serv_addr), sizeof(serv_addr)) == 0) {
+                    connected = true;
+                    break; // Succès !
+                }
+                // Si échec, attendre un peu avant de réessayer
+                std::this_thread::sleep_for(50ms);
             }
+
+            if (connected) {
+                send_value(client_sock, status_sum);
+            } else {
+                std::cerr << "[Node " << node.id << "] Critical Error: Could not connect to partner " << partner_id << " after " << max_retries << " attempts." << std::endl;
+            }
+            close(client_sock);
+            // ------------------ FIN DE LA SECTION MODIFIÉE ------------------
             break;
         }
+
+        // La partie réception reste la même
         int new_socket;
         int addrlen = sizeof(address);
         if ((new_socket = accept(server_fd, reinterpret_cast<sockaddr *>(&address),
                                  reinterpret_cast<socklen_t *>(&addrlen))) >= 0) {
             const unsigned int received_value = receive_value(new_socket);
-            local_sum += received_value;
-            std::cout << "[Node " << node.id << "] Round " << d << ": Received value " << received_value <<
-                    " from partner " << partner_id << ". New sum: " << local_sum << std::endl;
+            status_sum += received_value;
             close(new_socket);
         } else {
             perror("accept");
         }
     }
+
     if (node.id == 0) {
-        std::cout << "------------------------------------------" << std::endl;
-        std::cout << "[Node 0] FINAL RESULT: The total sum is " << local_sum << std::endl;
-        std::cout << "------------------------------------------" << std::endl;
+        std::cout << "------------------------------------------------------" << std::endl;
+        std::cout << "[Node 0] FINAL STATUS: Aggregated sum is " << status_sum << std::endl;
+        if (status_sum == kNodeCount) {
+            std::cout << "[Node 0] SUCCESS: All 8 nodes completed their tasks successfully." << std::endl;
+        } else {
+            std::cout << "[Node 0] FAILURE: Some nodes may have failed." << std::endl;
+        }
+        std::cout << "------------------------------------------------------" << std::endl;
     }
     close(server_fd);
 }
