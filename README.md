@@ -1,5 +1,7 @@
 # Project Hamon
 
+[![C++ CI](https://github.com/hackialand/hamon/actions/workflows/ci.yml/badge.svg)](https://github.com/hackialand/hamon/actions/workflows/ci.yml)
+
 Hamon is an experimental C++ implementation of a distributed computing framework, designed to be orchestrated on a single host machine. The project simulates a mini-cluster by launching multiple logical nodes that communicate via network sockets. The underlying architecture is inspired by a **hypercube topology**, nicknamed the "Hamon Cube," to optimize communication patterns and task parallelization.
 
 The implemented use case is a **MapReduce** task: a distributed word count. A "coordinator" node distributes chunks of a text file to "worker" nodes (the **Map** phase). The partial results are then efficiently aggregated by following the edges of the hypercube (the **Reduce** phase).
