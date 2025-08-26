@@ -10,4 +10,5 @@ CMakeCache.txt
 hamon
 .cmake/
 Testing/
+_deps
 WARP.md
