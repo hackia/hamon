@@ -9,8 +9,6 @@
 #include <sstream>
 #include <thread>
 #include <chrono>
-
-// Headers réseau requis
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -25,17 +23,15 @@ namespace Dualys {
 
         void print_final_results() const;
 
-        bool close_server_socket() const;
+        [[nodiscard]] bool close_server_socket() const;
 
         static void send_string(int sock, const std::string &str);
 
         bool run();
 
     private:
-        // La tâche à exécuter
-        WordCountMap perform_word_count_task(const std::string &text_chunk) const;
+        [[nodiscard]] WordCountMap perform_word_count_task(const std::string &text_chunk) const;
 
-        // Méthodes pour chaque phase
         bool setup_server();
 
         bool distribute_and_map();
