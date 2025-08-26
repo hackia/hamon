@@ -1,6 +1,21 @@
 #pragma once
 
+#include <iostream>
 #include <vector>
+#include <string>
+#include <thread>
+#include <cmath>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <chrono>
+#include <iostream>
+#include <vector>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <thread>
 
 namespace Dualys {
     /**
@@ -14,6 +29,14 @@ namespace Dualys {
         int id;
         /// IDs of directly connected neighbors in the hypercube.
         std::vector<int> neighbors;
+    };
+
+    // Structure pour les données de configuration d'un nœud, lues depuis le YAML
+    struct NodeConfig {
+        int id;
+        std::string role;
+        std::string ip_address;
+        int port;
     };
 
     /**
@@ -35,7 +58,38 @@ namespace Dualys {
          * Initializes 8 nodes with their respective 3 neighbors (degree = 3).
          * Complexity: O(N · d) where N = 8 and d = 3 for the 3D hypercube.
          */
-        HamonCube();
+        explicit HamonCube(int num_nodes);
+
+        /**
+         * @brief Get the total number of nodes in the 3D hypercube.
+         *
+         * The number of nodes corresponds to the predefined size of the hypercube
+         * (e.g., 8 nodes for a 3-dimensional hypercube).
+         *
+         * @return int The total number of nodes in the hypercube.
+         */
+        [[nodiscard]] int getNodeCount() const;
+
+        /**
+         * @brief Get the dimensionality of the hypercube.
+         *
+         * The dimension represents the number of binary bits used to define
+         * the hypercube. For example, a 3D hypercube has a dimension of 3.
+         *
+         * @return int The dimensionality of the hypercube.
+         */
+        [[nodiscard]] int getDimension() const;
+
+        /**
+         * @brief Retrieve all nodes of the 3D hypercube.
+         *
+         * Provides access to the internal collection of nodes representing
+         * the vertices of the hypercube.
+         *
+         * @return const std::vector<Node>& A constant reference to the container holding all nodes.
+         *         Each node encapsulates its ID and its adjacent neighbors.
+         */
+        [[nodiscard]] const std::vector<Node> &getNodes() const;
 
         /**
          * @brief Access a node by its ID.
@@ -50,18 +104,25 @@ namespace Dualys {
          * - Behavior for out-of-range IDs is unspecified and depends on the implementation.
          *   Callers should validate the ID before calling this function.
          */
-        const Node &getNode(int id) const;
-
+        [[nodiscard]] const Node &getNode(int id) const;
     private:
         /**
          * @brief Build the hypercube adjacency (neighbors for each node).
          *
-         * Populates the nodes container with 8 nodes and assigns neighbors such that
+         * Populates the node's container with 8 nodes and assigns neighbors such that
          * each pair of connected nodes differs by exactly one bit in their ID.
          */
         void initializeTopology();
-
-        /// Storage for the 8 nodes of the 3D hypercube, indexed by node ID.
+        int node_count;
+        int dimension;
+        /**
+         * @brief Container holding all nodes of the 3D hypercube.
+         *
+         * This vector stores Node instances representing the vertices of the
+         * 3-dimensional hypercube. Each node includes its ID and the IDs of its
+         * adjacent nodes. The container is populated during topology initialization
+         * and remains immutable afterward.
+         */
         std::vector<Node> nodes;
     };
 }
