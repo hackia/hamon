@@ -1,56 +1,21 @@
 #include "HamonNode.h"
+#include <fstream>
+#include <sstream>
+#include <vector>
 
 using namespace Dualys;
 using namespace std::chrono_literals;
 
-std::string serialize_map(const WordCountMap &map) {
-    std::stringstream ss;
-    for (const auto &[fst, snd]: map) {
-        ss << fst << ":" << snd << ",";
-    }
-    return ss.str();
+// --- Constructeur Corrigé ---
+HamonNode::HamonNode(const Node &p_topology_node, const HamonCube &p_cube, const std::vector<NodeConfig> &p_configs)
+    : topology_node(p_topology_node)
+    , cube(p_cube)
+    , server_fd(-1)
+    , all_configs(p_configs)
+{
 }
 
-void deserialize_and_merge_map(const std::string &str, WordCountMap &target_map) {
-    std::stringstream ss(str);
-    std::string segment;
-    while (std::getline(ss, segment, ',')) {
-        if (segment.empty()) continue;
-        size_t colon_pos = segment.find(':');
-        if (colon_pos != std::string::npos) {
-            std::string word = segment.substr(0, colon_pos);
-            const int count = std::stoi(segment.substr(colon_pos + 1));
-            target_map[word] += count;
-        }
-    }
-}
-
-// --- Implémentation de la classe HamonNode ---
-void HamonNode::print_final_results() const {
-    if (topology_node.id == 0) {
-        std::cout << "------------------------------------------" << std::endl;
-        std::cout << "[Node 0] FINAL RESULT: Word Counts" << std::endl;
-        for (const auto &[fst, snd]: local_counts) {
-            std::cout << " - '" << fst << "': " << snd << std::endl;
-        }
-        std::cout << "------------------------------------------" << std::endl;
-    }
-}
-
-bool HamonNode::close_server_socket() const {
-    return close(server_fd) == 0;
-}
-
-void HamonNode::send_string(const int sock, const std::string &str) {
-    const uint32_t len = htonl(str.length());
-    send(sock, &len, sizeof(len), 0);
-    send(sock, str.c_str(), str.length(), 0);
-}
-
-// Le constructeur prend maintenant la configuration en plus
-HamonNode::HamonNode(const Node &topology_node, const HamonCube &cube, const std::vector<NodeConfig> &configs)
-    : topology_node(topology_node), cube(cube), server_fd(-1), all_configs(configs) {
-}
+// --- Fonctions d'implémentation (certaines manquaient) ---
 
 bool HamonNode::run() {
     if (!setup_server()) return false;
@@ -68,7 +33,41 @@ bool HamonNode::run() {
     return close_server_socket();
 }
 
-// La tâche de comptage de mots
+void HamonNode::print_final_results() const {
+    if (topology_node.id == 0) {
+        std::cout << "------------------------------------------" << std::endl;
+        std::cout << "[Node 0] FINAL RESULT: Word Counts" << std::endl;
+        for (const auto &[fst, snd]: local_counts) {
+            std::cout << " - '" << fst << "': " << snd << std::endl;
+        }
+        std::cout << "------------------------------------------" << std::endl;
+    }
+}
+
+bool HamonNode::close_server_socket() const {
+    return close(server_fd) == 0;
+}
+
+void HamonNode::send_string(const int sock, const std::string &str) {
+    const uint32_t payload_len = static_cast<uint32_t>(str.size());
+    const uint32_t net_len = htonl(payload_len);
+    send(sock, &net_len, sizeof(net_len), 0);
+    send(sock, str.c_str(), str.size(), 0);
+}
+
+std::string HamonNode::receive_string(int client_socket) {
+    uint32_t len = 0;
+    if (read(client_socket, &len, sizeof(len)) != sizeof(len)) return "";
+    len = ntohl(len);
+    if (len > 0 && len < 65536) { // Petite sécurité
+        std::vector<char> buffer(len);
+        if (read(client_socket, buffer.data(), len) == static_cast<ssize_t>(len)) {
+            return std::string(buffer.begin(), buffer.end());
+        }
+    }
+    return "";
+}
+
 WordCountMap HamonNode::perform_word_count_task(const std::string &text_chunk) const {
     std::cout << "[Node " << topology_node.id << "] Starting Word Count task..." << std::endl;
     WordCountMap counts;
@@ -81,14 +80,36 @@ WordCountMap HamonNode::perform_word_count_task(const std::string &text_chunk) c
     return counts;
 }
 
+std::string HamonNode::serialize_map(const WordCountMap &target_map) {
+    std::stringstream ss;
+    for (const auto& [word, count] : target_map) {
+        ss << word << ":" << count << ",";
+    }
+    return ss.str();
+}
+
+void HamonNode::deserialize_and_merge_map(const std::string &x, WordCountMap &map) {
+    std::stringstream ss(x);
+    std::string segment;
+    while (std::getline(ss, segment, ',')) {
+        if (segment.empty()) continue;
+        size_t colon_pos = segment.find(':');
+        if (colon_pos != std::string::npos) {
+            std::string word = segment.substr(0, colon_pos);
+            const int count = std::stoi(segment.substr(colon_pos + 1));
+            map[word] += count;
+        }
+    }
+}
+
 bool HamonNode::setup_server() {
-    const NodeConfig &self_config = all_configs[topology_node.id];
+    const auto &self_config = all_configs[static_cast<std::size_t>(topology_node.id)];
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
 
     sockaddr_in address{};
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(self_config.port);
+    address.sin_port = htons(static_cast<uint16_t>(self_config.port));
 
     constexpr int opt = 1;
     setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
@@ -107,41 +128,37 @@ bool HamonNode::setup_server() {
 
 bool HamonNode::distribute_and_map() {
     if (topology_node.id == 0) {
-        // Logique du Coordinateur
         std::cout << "[Node 0] Reading input file and distributing tasks..." << std::endl;
         std::ifstream file("input.txt");
         if (!file.is_open()) {
             std::cerr << "[Node 0] CRITICAL ERROR: Could not open input.txt" << std::endl;
             return false;
         }
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        std::string content = buffer.str();
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
-        size_t chunk_size = content.length() / cube.getNodeCount();
+        const auto node_count = static_cast<size_t>(cube.getNodeCount());
+        if (node_count == 0) return false;
+        const size_t chunk_size = content.length() / node_count;
 
-        // Distribuer à chaque worker sa part du texte
-        for (int i = 1; i < cube.getNodeCount(); ++i) {
+        for (size_t i = 1; i < node_count; ++i) {
             const NodeConfig &worker_config = all_configs[i];
             int worker_sock = socket(AF_INET, SOCK_STREAM, 0);
             sockaddr_in serv_addr{};
             serv_addr.sin_family = AF_INET;
-            serv_addr.sin_port = htons(worker_config.port);
+            serv_addr.sin_port = htons(static_cast<uint16_t>(worker_config.port));
             inet_pton(AF_INET, worker_config.ip_address.c_str(), &serv_addr.sin_addr);
 
             if (connect(worker_sock, reinterpret_cast<sockaddr *>(&serv_addr), sizeof(serv_addr)) == 0) {
-                size_t start = i * chunk_size;
-                size_t size = i == cube.getNodeCount() - 1 ? std::string::npos : chunk_size;
+                const size_t start = i * chunk_size;
+                const size_t size = (i == node_count - 1) ? std::string::npos : chunk_size;
                 send_string(worker_sock, content.substr(start, size));
                 close(worker_sock);
             } else {
                 std::cerr << "[Node 0] Failed to connect to worker " << i << " to distribute task." << std::endl;
             }
         }
-        // Le coordinateur fait aussi sa part du travail
         local_counts = perform_word_count_task(content.substr(0, chunk_size));
     } else {
-        // Logique des Workers
         std::cout << "[Node " << topology_node.id << "] Waiting for task from coordinator..." << std::endl;
         sockaddr_in client_addr{};
         socklen_t addrlen = sizeof(client_addr);
@@ -157,39 +174,19 @@ bool HamonNode::distribute_and_map() {
     return true;
 }
 
-std::string HamonNode::receive_string(const int client_socket) {
-    uint32_t len = 0;
-    read(client_socket, &len, sizeof(len));
-    len = ntohl(len);
-    if (len > 0 && len < 65536) {
-        // Petite sécurité
-        std::vector<char> buffer(len);
-        read(client_socket, buffer.data(), len);
-        return std::string(buffer.begin(), buffer.end());
-    }
-    return "";
-}
-
-std::string HamonNode::serialize_map(const WordCountMap &map) {
-    std::stringstream ss;
-    for (const auto &[fst, snd]: map) {
-        ss << fst << ":" << snd << ",";
-    }
-    return ss.str();
-}
-
 bool HamonNode::reduce() {
     std::cout << "[Node " << topology_node.id << "] Starting reduce phase..." << std::endl;
 
     for (int d = 0; d < cube.getDimension(); ++d) {
-        const auto partner_id = topology_node.id ^ 1 << d;
-        const NodeConfig &partner_config = all_configs[partner_id];
+        const auto partner_id = topology_node.id ^ (1 << d);
+        if (static_cast<size_t>(partner_id) >= all_configs.size()) continue;
+        const NodeConfig &partner_config = all_configs[static_cast<size_t>(partner_id)];
 
         if (topology_node.id > partner_id) {
-            const int client_sock = socket(AF_INET, SOCK_STREAM, 0);
+            int client_sock = socket(AF_INET, SOCK_STREAM, 0);
             sockaddr_in serv_addr{};
             serv_addr.sin_family = AF_INET;
-            serv_addr.sin_port = htons(partner_config.port);
+            serv_addr.sin_port = htons(static_cast<uint16_t>(partner_config.port));
             inet_pton(AF_INET, partner_config.ip_address.c_str(), &serv_addr.sin_addr);
 
             bool connected = false;
@@ -204,13 +201,12 @@ bool HamonNode::reduce() {
             if (connected) {
                 send_string(client_sock, serialize_map(local_counts));
             } else {
-                std::cerr << "[Node " << topology_node.id << "] Reduce phase: could not connect to partner " <<
-                        partner_id << std::endl;
+                std::cerr << "[Node " << topology_node.id << "] Reduce phase: could not connect to partner " << partner_id << std::endl;
             }
             close(client_sock);
-            break; // Mon rôle dans la réduction est terminé.
+            break;
         }
-        // Je reçois la map de mon partenaire et je la fusionne
+
         sockaddr_in client_addr{};
         socklen_t addrlen = sizeof(client_addr);
         int client_socket = accept(server_fd, reinterpret_cast<sockaddr *>(&client_addr), &addrlen);
@@ -225,4 +221,3 @@ bool HamonNode::reduce() {
     }
     return true;
 }
-

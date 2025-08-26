@@ -104,7 +104,7 @@ namespace Dualys {
          * - Behavior for out-of-range IDs is unspecified and depends on the implementation.
          *   Callers should validate the ID before calling this function.
          */
-        [[nodiscard]] const Node &getNode(int id) const;
+        [[nodiscard]] const Node &getNode(size_t id) const;
     private:
         /**
          * @brief Build the hypercube adjacency (neighbors for each node).

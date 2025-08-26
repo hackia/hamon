@@ -18,13 +18,13 @@ int largest_power_of_two(const unsigned int n) {
 
 std::vector<NodeConfig> generate_configs(const int node_count) {
     std::vector<NodeConfig> configs;
-    configs.reserve(node_count);
-    for (int i = 0; i < node_count; ++i) {
+    configs.reserve(static_cast<std::size_t>(node_count));
+    for (std::size_t i = 0; i < static_cast<std::size_t>(node_count); ++i) {
         NodeConfig cfg;
-        cfg.id = i;
+        cfg.id = static_cast<int>(i);
         cfg.role = i == 0 ? "coordinator" : "worker";
         cfg.ip_address = "127.0.0.1";
-        cfg.port = 8000 + i;
+        cfg.port = 8000 + static_cast<int>(i);
         configs.push_back(cfg);
     }
     return configs;
@@ -32,7 +32,7 @@ std::vector<NodeConfig> generate_configs(const int node_count) {
 
 void run_node_process(const int node_id,const int node_count, const std::vector<NodeConfig>& configs) {
     const HamonCube cube(node_count);
-    HamonNode node(cube.getNode(node_id), cube, configs);
+    HamonNode node(cube.getNode(static_cast<std::size_t>(node_id)), cube, configs);
     node.run();
 }
 
@@ -55,12 +55,12 @@ int main() {
 
     // 2. L'orchestrateur LANCE les processus enfants
     std::vector<pid_t> childPids;
-    childPids.reserve(node_count);
-    for (int i = 0; i < node_count; ++i) {
+    childPids.reserve(static_cast<std::size_t>(node_count));
+    for (std::size_t i = 0; i < static_cast<std::size_t>(node_count); ++i) {
         const pid_t pid = fork();
         if (pid == 0) { // Processus enfant
             // Chaque enfant reçoit la config complète
-            run_node_process(i, node_count, configs);
+            run_node_process(static_cast<int>(i), node_count, configs);
             _exit(0);
         }
         if (pid > 0) {

@@ -17,9 +17,12 @@
 namespace Dualys {
     using WordCountMap = std::map<std::string, int>;
 
+
     class HamonNode {
     public:
-        HamonNode(const Node& topology_node, const HamonCube& cube, const std::vector<NodeConfig>& configs);
+        void initializeTopology();
+
+        HamonNode(const Node &p_topology_node, const HamonCube &p_cube, const std::vector<NodeConfig> &p_configs);
 
         void print_final_results() const;
 
@@ -28,6 +31,10 @@ namespace Dualys {
         static void send_string(int sock, const std::string &str);
 
         bool run();
+
+        static std::string serialize_map(const WordCountMap &target_map);
+
+        static void deserialize_and_merge_map(const std::string &x, WordCountMap &map);
 
     private:
         [[nodiscard]] WordCountMap perform_word_count_task(const std::string &text_chunk) const;
@@ -38,11 +45,10 @@ namespace Dualys {
 
         static std::string receive_string(int client_socket);
 
-        static std::string serialize_map(const WordCountMap &map);
+        [[nodiscard]] bool reduce();
 
-        bool reduce();
-        const Node &topology_node;
-        const HamonCube &cube;
+        Node topology_node;
+        HamonCube cube;
         int server_fd;
         WordCountMap local_counts;
         std::vector<NodeConfig> all_configs;
