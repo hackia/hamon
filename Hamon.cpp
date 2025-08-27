@@ -112,9 +112,19 @@ void HamonParser::parse_file(const std::string &path) {
 }
 
 void HamonParser::parse_line(const std::string &line) {
-    const std::string s = trim(line);
+    std::string s = trim(line);
     if (s.empty()) return;
     if (starts_with(s, "//") || starts_with(s, "#")) return;
+    auto cpos = s.find("//");
+    if (cpos != std::string::npos) {
+        s = trim(s.substr(0, cpos));
+    }
+    if (s.empty()) return;
+    cpos = s.find("#");
+    if (cpos != std::string::npos) {
+        s = trim(s.substr(0, cpos));
+    }
+    if (s.empty()) return;
 
     // --- Directives globales ---
     if (starts_with(s, "@use")) {
@@ -196,16 +206,14 @@ void HamonParser::parse_line(const std::string &line) {
         n.port = p;
         return;
     }
-
     if (starts_with(s, "@neighbors")) {
         if (currentNodeId < 0) bad("@neighbors used outside of @node");
-        auto rest = trim(s.substr(std::string("@neighbors").size()));
+        const auto rest = trim(s.substr(std::string("@neighbors").size()));
         if (rest.empty()) bad("@neighbors expects [list]");
         ensure_node(currentNodeId).neighbors = parse_list_ids(rest);
         return;
     }
-
-   // bad("Unknown directive: " + s);
+    bad("Unknown directive: " + s);
 }
 
 void HamonParser::finalize() {
@@ -271,6 +279,22 @@ void HamonParser::finalize() {
             }
         }
     }
+    // À la fin de finalize(), après avoir rempli les voisins par défaut si besoin :
+    for (int id = 0; id < nodes; ++id) {
+        auto &n = *config[static_cast<std::size_t>(id)];
+        // supprimer doublons
+        std::ranges::sort(n.neighbors);
+        n.neighbors.erase(std::ranges::unique(n.neighbors).begin(), n.neighbors.end());
+        // pas d’auto-voisin
+        std::erase(n.neighbors, id);
+        // vérifier bornes
+        for (const int v: n.neighbors) {
+            if (v < 0 || v >= nodes) {
+                bad("Neighbor out of range for node " + std::to_string(id) + ": " + std::to_string(v));
+            }
+        }
+    }
+
     // pour d’autres topologies, on laisse @neighbors custom s’ils sont fournis (sinon isolé)
 }
 

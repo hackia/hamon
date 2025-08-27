@@ -13,3 +13,4 @@ Testing/
 _deps
 WARP.md
 CTestTestfile.cmake
+hamon_tests[1]_include.cmake

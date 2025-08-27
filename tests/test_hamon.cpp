@@ -19,6 +19,55 @@ namespace {
     };
 } // namespace
 
+TEST(Hamon, NeighborsOutsideNodeThrows) {
+    HamonParser p;
+    std::string dsl =
+            "@use 4\n"
+            "@neighbors [0,3]\n"; // pas de @node ouvert
+    TmpFile tf("scenario_neighbors_outside.hc");
+    {
+        std::ofstream o(tf.path);
+        o << dsl;
+    }
+    EXPECT_THROW(p.parse_file(tf.path), std::runtime_error);
+}
+
+TEST(Hamon, NeighborOutOfRangeThrows) {
+    HamonParser p;
+    std::string dsl =
+            "@use 4\n"
+            "@node 2\n"
+            "@neighbors [0,99]\n";
+    TmpFile tf("scenario_neighbors_oor.hc");
+    {
+        std::ofstream o(tf.path);
+        o << dsl;
+    }
+    p.parse_file(tf.path);
+    EXPECT_THROW(p.finalize(), std::runtime_error);
+}
+
+TEST(Hamon, NeighborSelfLoopRemovedAndDeduped) {
+    HamonParser p;
+    std::string dsl =
+            "@use 4\n"
+            "@node 2\n"
+            "@neighbors [2,1,1]\n"; // self + doublon
+    TmpFile tf("scenario_neighbors_selfdup.hc");
+    {
+        std::ofstream o(tf.path);
+        o << dsl;
+    }
+    p.parse_file(tf.path);
+    p.finalize();
+    auto nodes = p.materialize_nodes();
+    std::vector<int> got = nodes[2].neighbors;
+    std::ranges::sort(got);
+    std::vector expected{1}; // self retiré, doublon éliminé
+    EXPECT_EQ(got, expected);
+}
+
+
 TEST(Hamon, ParseMinimalHypercube4) {
     HamonParser p;
     std::string dsl =
@@ -119,21 +168,18 @@ TEST(Hamon, NeighborsOverride) {
     auto nodes = p.materialize_nodes();
 
 
-
     std::cerr << "Node 1 neighbors:";
     for (int v: nodes[1].neighbors) std::cerr << " " << v;
     std::cerr << "\n";
-
-
 
 
     ASSERT_EQ(static_cast<int>(nodes.size()), 4);
 
     // on vérifie le contenu sans supposer l'ordre
     std::vector<int> got = nodes[1].neighbors;
-    std::sort(got.begin(), got.end());
-    std::vector<int> expected{0, 3};
-    std::sort(expected.begin(), expected.end());
+    std::ranges::sort(got);
+    std::vector expected{0, 3};
+    std::ranges::sort(expected);
 
 
     std::cerr << "Node 1 neighbors:";
@@ -141,10 +187,8 @@ TEST(Hamon, NeighborsOverride) {
     std::cerr << "\n";
 
 
-
     ASSERT_EQ(got.size(), expected.size()) << "Neighbors count differs";
     for (size_t i = 0; i < expected.size(); ++i) {
-
         std::cerr << "Node 1 neighbors:";
         for (int v: nodes[1].neighbors) std::cerr << " " << v;
         std::cerr << "\n";
