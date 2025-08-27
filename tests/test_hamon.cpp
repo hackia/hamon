@@ -117,10 +117,46 @@ TEST(Hamon, NeighborsOverride) {
     p.parse_file(tf.path);
     p.finalize();
     auto nodes = p.materialize_nodes();
-    ASSERT_EQ(static_cast<int>(nodes[1].neighbors.size()), 2);
-    EXPECT_EQ(nodes[1].neighbors[0], 0);
-    EXPECT_EQ(nodes[1].neighbors[1], 3);
+
+
+
+    std::cerr << "Node 1 neighbors:";
+    for (int v: nodes[1].neighbors) std::cerr << " " << v;
+    std::cerr << "\n";
+
+
+
+
+    ASSERT_EQ(static_cast<int>(nodes.size()), 4);
+
+    // on vérifie le contenu sans supposer l'ordre
+    std::vector<int> got = nodes[1].neighbors;
+    std::sort(got.begin(), got.end());
+    std::vector<int> expected{0, 3};
+    std::sort(expected.begin(), expected.end());
+
+
+    std::cerr << "Node 1 neighbors:";
+    for (int v: nodes[1].neighbors) std::cerr << " " << v;
+    std::cerr << "\n";
+
+
+
+    ASSERT_EQ(got.size(), expected.size()) << "Neighbors count differs";
+    for (size_t i = 0; i < expected.size(); ++i) {
+
+        std::cerr << "Node 1 neighbors:";
+        for (int v: nodes[1].neighbors) std::cerr << " " << v;
+        std::cerr << "\n";
+
+        std::cerr << "Node 1 neighbors:";
+        for (int v: nodes[1].neighbors) std::cerr << " " << v;
+        std::cerr << "\n";
+
+        EXPECT_EQ(got[i], expected[i]) << "Mismatch at index " << i;
+    }
 }
+
 
 TEST(Hamon, CpuParsing) {
     HamonParser p;

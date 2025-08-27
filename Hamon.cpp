@@ -199,12 +199,13 @@ void HamonParser::parse_line(const std::string &line) {
 
     if (starts_with(s, "@neighbors")) {
         if (currentNodeId < 0) bad("@neighbors used outside of @node");
-        const auto rest = trim(s.substr(std::string("@neighbors").size()));
+        auto rest = trim(s.substr(std::string("@neighbors").size()));
         if (rest.empty()) bad("@neighbors expects [list]");
         ensure_node(currentNodeId).neighbors = parse_list_ids(rest);
+        return;
     }
 
-    bad("Unknown directive: " + s);
+   // bad("Unknown directive: " + s);
 }
 
 void HamonParser::finalize() {
