@@ -15,7 +15,7 @@ set(GCC_WARNING_FLAGS
 )
 # Applique ces options à toutes les cibles du projet
 
-add_library(cube STATIC HamonCube.cpp HamonCube.h HamonNode.cpp HamonNode.h)
+add_library(cube STATIC HamonCube.cpp HamonCube.h HamonNode.cpp HamonNode.h Hamon.cpp Hamon.h)
 target_compile_options(cube PRIVATE ${GCC_WARNING_FLAGS})
 add_executable(hamon main.cpp)
 target_compile_options(hamon PRIVATE ${GCC_WARNING_FLAGS})
@@ -44,6 +44,7 @@ FetchContent_MakeAvailable(googletest)
 add_executable(
         hamon_tests
         # Ajoute tes fichiers de test ici
+        tests/test_hamon.cpp
         tests/test_hamon_cube.cpp
         tests/test_hamon_node.cpp
 )

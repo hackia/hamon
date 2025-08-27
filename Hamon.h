@@ -6,6 +6,7 @@
 #include <iostream>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -21,10 +22,33 @@ namespace Dualys {
         std::vector<int> neighbors; // logical neighbors (ids)
     };
 
-
     class HamonParser {
+    public:
         HamonParser();
 
+        // Parsing
+        void parse_file(const std::string &path);
+
+        void parse_line(const std::string &line);
+
+        // Finalisation (remplit les manques, construit la topologie par défaut, etc.)
+        void finalize();
+
+        // Accès
+        [[nodiscard]] int use_nodes() const { return nodes; }
+
+        [[nodiscard]] int dim() const;
+
+        [[nodiscard]] const std::string &get_topology() const;
+
+        // Récupérer une vue aplatie des NodeCfg (après finalize)
+        [[nodiscard]] std::vector<NodeCfg> materialize_nodes() const;
+
+        // Affichage « dry-run »
+        void print_plan(std::ostream &os = std::cout) const;
+
+    private:
+        // Helpers (purs C++17, sans dépendances)
         static std::string trim(const std::string &x);
 
         static bool starts_with(const std::string &s, const std::string &p);
@@ -39,21 +63,22 @@ namespace Dualys {
 
         static int log2i(unsigned x);
 
+        // Gestion des nœuds
         NodeCfg &ensure_node(int id);
 
-        static void parse_line(const std::string & line);
+        // Erreur contextualisée
+        [[noreturn]] void bad(const std::string &msg) const;
 
-        static void parse_file(const std::string &path);
-
-        void finalize();
-
-        static void bad(const std::string &msg);
-
-        int nodes = -1; // number of nodes to use (@use)
-        int dimensions = -1; // hypercube dimensions (optional; auto if power-of-two useN)
-        std::string topology = "hypercube"; // default topology
-        std::string hostname = ""; // from @auto
-        int autoPortBase = -1; // from @auto
+        // État courant de parsing
+        int nodes = -1; // @use
+        int dimensions = -1; // @dim (auto si @use est puissance de 2)
+        std::string topology = "hypercube"; // @topology
+        std::string hostname; // @autoprefix host:port OU @auto host:port
+        int autoPortBase = -1; // idem
         std::vector<std::optional<NodeCfg> > config;
+
+        // Contexte parsing
+        int currentNodeId = -1;
+        int currentLine = 0;
     };
-}
+} // namespace Dualys
