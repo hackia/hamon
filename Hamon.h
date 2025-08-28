@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <optional>
@@ -9,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace Dualys {
@@ -47,6 +49,9 @@ namespace Dualys {
         // Affichage « dry-run »
         void print_plan(std::ostream &os = std::cout) const;
 
+        std::string expand_vars(const std::string &in) const; // remplace ${VAR}
+        bool eval_require_expr(const std::string &raw) const; // évalue @require
+
     private:
         // Helpers (purs C++17, sans dépendances)
         static std::string trim(const std::string &x);
@@ -66,6 +71,10 @@ namespace Dualys {
         // Gestion des nœuds
         NodeCfg &ensure_node(int id);
 
+        static bool is_truthy(const std::string &v);
+
+        static bool str_to_int(const std::string &s, long long &out);
+
         // Erreur contextualisée
         [[noreturn]] void bad(const std::string &msg) const;
 
@@ -80,5 +89,10 @@ namespace Dualys {
         // Contexte parsing
         int currentNodeId = -1;
         int currentLine = 0;
+        std::unordered_map<std::string, std::string> vars; // @let
+        std::vector<std::filesystem::path> file_stack; // pile des fichiers
+        std::unordered_set<std::string> include_guard; // chemins absolus visités
+        int include_depth = 0;
+        const int include_depth_max = 32;
     };
 } // namespace Dualys

@@ -1,6 +1,9 @@
 #include "Hamon.h"
 
+#include <regex>
+
 using namespace Dualys;
+namespace fs = std::filesystem;
 
 // ------------ Helpers ------------
 std::string HamonParser::trim(const std::string &x) {
@@ -101,13 +104,47 @@ NodeCfg &HamonParser::ensure_node(const int id) {
 }
 
 void HamonParser::parse_file(const std::string &path) {
-    std::ifstream in(path);
-    if (!in.is_open()) bad("Failed to open file: " + path);
+    fs::path p = fs::absolute(path);
+    if (include_depth >= include_depth_max) bad("Include depth exceeded");
+    if (!fs::exists(p)) bad("Failed to open file: " + p.string());
+
+    std::string key = p.string();
+    if (include_guard.count(key)) {
+        bad("Circular include detected: " + key);
+    }
+
+    std::ifstream in(p);
+    if (!in.is_open()) bad("Failed to open file: " + p.string());
+
+    // RAII guard pour stack et guard set
+    struct IncludeGuardRAII {
+        HamonParser *self;
+        std::string key;
+        fs::path path;
+
+        IncludeGuardRAII(HamonParser *s, std::string k, fs::path pth)
+            : self(s), key(std::move(k)), path(std::move(pth)) {
+            self->include_guard.insert(key);
+            self->file_stack.push_back(path);
+            self->include_depth++;
+        }
+
+        ~IncludeGuardRAII() {
+            self->include_guard.erase(key);
+            if (!self->file_stack.empty()) self->file_stack.pop_back();
+            self->include_depth--;
+        }
+    } guard(this, key, p);
+
     std::string line;
     currentLine = 0;
     while (std::getline(in, line)) {
         ++currentLine;
-        parse_line(line);
+        std::string s = trim(line);
+        auto cpos = s.find("//");
+        if (cpos != std::string::npos) s = trim(s.substr(0, cpos));
+        if (s.empty()) continue;
+        parse_line(s);
     }
 }
 
@@ -125,6 +162,107 @@ void HamonParser::parse_line(const std::string &line) {
         s = trim(s.substr(0, cpos));
     }
     if (s.empty()) return;
+    if (starts_with(s, "@include")) {
+        std::string rest = trim(s.substr(std::string("@include").size()));
+        if (rest.empty()) bad("@include expects a path");
+
+        auto strip_quotes = [](std::string &x) {
+            x = trim(x);
+            if (x.size() >= 2) {
+                const char a = x.front(), b = x.back();
+                if ((a == '"' && b == '"') || (a == '\'' && b == '\'')) {
+                    x = x.substr(1, x.size() - 2);
+                }
+            }
+        };
+
+        // 1) strip quotes (premier passage)
+        strip_quotes(rest);
+        // 2) expand ${VAR}
+        rest = expand_vars(rest);
+        // 3) re-trim & strip quotes (au cas où l’expansion a introduit des guillemets)
+        strip_quotes(rest);
+
+        // 4) base = dossier du fichier courant; fallback = cwd
+        fs::path base = file_stack.empty() ? fs::current_path() : file_stack.back().parent_path();
+        fs::path target = fs::absolute(base / rest);
+
+        // Debug utile si un jour ça recasse (tu peux laisser ou commenter)
+        // std::cerr << "[include] base=" << base << " rest=" << rest << " target=" << target << "\n";
+
+        if (!fs::exists(target)) {
+            bad(std::string("@include file not found: ") + target.string() +
+                " (base=" + base.string() + ", rest=" + rest + ")");
+        }
+
+        parse_file(target.string());
+        return;
+    }
+
+    if (starts_with(s, "@auto") || starts_with(s, "@autoprefix")) {
+        auto pos = s.find(' ');
+        if (pos == std::string::npos) bad("@auto expects HOST:PORT");
+        std::string hp = trim(s.substr(pos + 1));
+        hp = expand_vars(hp); // <<< FIX 2 : expansion avant parse_host_port
+        parse_host_port(hp, hostname, autoPortBase);
+        return;
+    }
+
+    if (starts_with(s, "@ip")) {
+        if (currentNodeId < 0) bad("@ip used outside of @node");
+        auto rest = trim(s.substr(std::string("@ip").size()));
+        rest = expand_vars(rest); // <<< FIX 2 : expansion
+        std::string h;
+        int p = -1;
+        parse_host_port(rest, h, p);
+        auto &n = ensure_node(currentNodeId);
+        n.host = h;
+        n.port = p;
+        return;
+    }
+
+
+    // ----- @let -----
+    if (starts_with(s, "@let")) {
+        std::string rest = trim(s.substr(std::string("@let").size()));
+        if (rest.empty()) bad("@let expects NAME=VALUE or NAME VALUE");
+        auto eq = rest.find('=');
+        std::string name, value;
+        if (eq == std::string::npos) {
+            if (const auto toks = split_ws(rest); toks.size() == 1) {
+                name = toks[0];
+                value = "1";
+            } else if (toks.size() >= 2) {
+                name = toks[0];
+                value.clear();
+                for (size_t i = 1; i < toks.size(); ++i) {
+                    if (i > 1) value.push_back(' ');
+                    value += toks[i];
+                }
+            } else bad("@let invalid syntax");
+        } else {
+            name = trim(rest.substr(0, eq));
+            value = trim(rest.substr(eq + 1));
+        }
+        if (name.empty()) bad("@let invalid name");
+        // retire guillemets autour de value
+        if (value.size() >= 2 && ((value.front() == '"' && value.back() == '"') || (
+                                      value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        vars[name] = expand_vars(value);
+        return;
+    }
+
+    // ----- @require -----
+    if (starts_with(s, "@require")) {
+        std::string rest = trim(s.substr(std::string("@require").size()));
+        if (rest.empty()) bad("@require expects an expression");
+        if (!eval_require_expr(rest)) {
+            bad(std::string("@require failed: ") + rest);
+        }
+        return;
+    }
 
     // --- Directives globales ---
     if (starts_with(s, "@use")) {
@@ -332,4 +470,103 @@ void HamonParser::print_plan(std::ostream &os) const {
             os << "]\n";
         }
     os << std::flush;
+}
+
+std::string HamonParser::expand_vars(const std::string &in) const {
+    static const std::regex re(R"(\$\{([A-Za-z_][A-Za-z0-9_]*)\})");
+    std::string out;
+    out.reserve(in.size());
+    std::sregex_iterator it(in.begin(), in.end(), re);
+    size_t last = 0;
+    for (const std::sregex_iterator end; it != end; ++it) {
+        const auto &m = *it;
+        out.append(in, last, static_cast<size_t>(m.position()) - last);
+        std::string key = m[1].str();
+        if (const auto itv = vars.find(key); itv != vars.end()) out += itv->second;
+        else out += m.str();
+        last = static_cast<size_t>(m.position() + m.length());
+    }
+    out.append(in, last, std::string::npos);
+    return out;
+}
+
+
+// ---------- eval_require_expr ----------
+bool HamonParser::is_truthy(const std::string &v) {
+    if (v.empty()) return false;
+    std::string s;
+    s.reserve(v.size());
+    for (const char c: v) s.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+    return !(s == "0" || s == "false" || s == "no" || s == "off");
+}
+
+bool HamonParser::str_to_int(const std::string &s, long long &out) {
+    char *end = nullptr;
+    errno = 0;
+    const long long v = std::strtoll(s.c_str(), &end, 10);
+    if (errno != 0 || end == s.c_str() || *end != '\0') return false;
+    out = v;
+    return true;
+}
+
+bool HamonParser::eval_require_expr(const std::string &raw) const {
+    const std::string s = trim(raw);
+    if (s.empty()) return false;
+
+    std::vector<std::string> tok;
+    {
+        bool inq = false;
+        std::string cur;
+        for (size_t i = 0; i < s.size(); ++i) {
+            const char c = s[i];
+            if (c == '"') {
+                inq = !inq;
+                continue;
+            }
+            if (!inq && std::isspace(static_cast<unsigned char>(c))) {
+                if (!cur.empty()) {
+                    tok.push_back(cur);
+                    cur.clear();
+                }
+            } else {
+                cur.push_back(c);
+            }
+        }
+        if (!cur.empty()) tok.push_back(cur);
+    }
+    if (tok.empty()) return false;
+
+    const auto resolve = [&](const std::string &t)-> std::string {
+        const std::string e = expand_vars(t);
+        return e;
+    };
+
+    if (tok.size() == 1) {
+        const std::string v = resolve(tok[0]);
+        return is_truthy(v);
+    }
+    if (tok.size() >= 3) {
+        const std::string L = resolve(tok[0]);
+        const std::string OP = tok[1];
+        // re-colle le RHS (au cas où il y avait des espaces entre guillemets)
+        std::string R;
+        for (size_t i = 2; i < tok.size(); ++i) {
+            if (i > 2) R.push_back(' ');
+            R += tok[i];
+        }
+        R = resolve(R);
+
+        long long Li, Ri;
+        const bool Li_ok = str_to_int(L, Li);
+        const bool Ri_ok = str_to_int(R, Ri);
+
+        if (OP == "==") return L == R;
+        if (OP == "!=") return L != R;
+        if (OP == ">") return Li_ok && Ri_ok ? Li > Ri : false;
+        if (OP == "<") return Li_ok && Ri_ok ? Li < Ri : false;
+        if (OP == ">=") return Li_ok && Ri_ok ? Li >= Ri : false;
+        if (OP == "<=") return Li_ok && Ri_ok ? Li <= Ri : false;
+        return false;
+    }
+    return false;
 }

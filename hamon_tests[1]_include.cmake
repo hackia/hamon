@@ -1,0 +1,5 @@
+if(EXISTS "/home/seido/CLionProjects/hamon/hamon_tests[1]_tests.cmake")
+  include("/home/seido/CLionProjects/hamon/hamon_tests[1]_tests.cmake")
+else()
+  add_test(hamon_tests_NOT_BUILT hamon_tests_NOT_BUILT)
+endif()

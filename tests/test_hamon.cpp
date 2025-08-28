@@ -273,3 +273,138 @@ TEST(Hamon, BadDirectiveThrowsEarly) {
     // L'erreur se produit à la lecture (parse_line) avant finalize()
     EXPECT_THROW(p.parse_file(tf.path), std::runtime_error);
 }
+
+// --- INCLUDE de base ---
+TEST(Hamon, IncludeBasic) {
+    HamonParser p;
+
+    // fichier inclus
+    TmpFile inc("inc1.hc");
+    {
+        std::ofstream o(inc.path);
+        o << "@use 2\n"
+                "@auto 127.0.0.1:6000\n";
+    }
+
+    // fichier principal
+    TmpFile mainf("main1.hc");
+    {
+        std::ofstream o(mainf.path);
+        o << "@include \"" << inc.path << "\"\n";
+    }
+
+    p.parse_file(mainf.path);
+    p.finalize();
+
+    EXPECT_EQ(p.use_nodes(), 2);
+    auto nodes = p.materialize_nodes();
+    ASSERT_EQ(static_cast<int>(nodes.size()), 2);
+    EXPECT_EQ(nodes[1].port, 6001);
+}
+TEST(Hamon, IncludeWithVarsAndRelative) {
+    HamonParser p;
+
+    namespace fs = std::filesystem;
+    fs::path cwd = fs::current_path();
+    fs::path subdir = cwd / "sub";
+    fs::create_directories(subdir);
+    ASSERT_TRUE(fs::exists(subdir));
+
+    TmpFile inc((subdir / "inc2.hc").string());
+    { std::ofstream o(inc.path); o << "@use 4\n"; }
+    ASSERT_TRUE(fs::exists(inc.path));
+
+    TmpFile mainf("main2.hc");
+    { std::ofstream o(mainf.path);
+        o << "@let DIR=" << subdir.string() << "\n"
+             "@include \"${DIR}/inc2.hc\"\n"
+             "@auto 10.0.0.1:7000\n"; }
+
+    p.parse_file(mainf.path);
+    p.finalize();
+
+    EXPECT_EQ(p.use_nodes(), 4);
+    auto nodes = p.materialize_nodes();
+    ASSERT_EQ((int)nodes.size(), 4);
+    EXPECT_EQ(nodes[3].port, 7003);
+}
+
+TEST(Hamon, LetExpansionInAutoAndIp) {
+    HamonParser p;
+    TmpFile f("let_auto.hc");
+    {
+        std::ofstream o(f.path);
+        o << "@use 2\n"
+                "@let BASE=127.0.0.1:9000\n"
+                "@auto ${BASE}\n"
+                "@node 1\n"
+                "@let HOST=192.168.0.50\n"
+                "@let PORT=5555\n"
+                "@ip ${HOST}:${PORT}\n";
+    }
+    p.parse_file(f.path);
+    p.finalize();
+    auto nodes = p.materialize_nodes();
+    EXPECT_EQ(nodes[0].port, 9000);
+    EXPECT_EQ(nodes[1].host, "192.168.0.50");
+    EXPECT_EQ(nodes[1].port, 5555);
+}
+
+// --- REQUIRE: succès simple (variable truthy) ---
+TEST(Hamon, RequireTruthyVar) {
+    HamonParser p;
+    TmpFile f("req1.hc");
+    {
+        std::ofstream o(f.path);
+        o << "@let ENABLE=1\n"
+                "@require ${ENABLE}\n"
+                "@use 2\n";
+    }
+    EXPECT_NO_THROW(p.parse_file(f.path));
+    EXPECT_NO_THROW(p.finalize());
+}
+
+// --- REQUIRE: échec simple ---
+TEST(Hamon, RequireFail) {
+    HamonParser p;
+    TmpFile f("req2.hc");
+    {
+        std::ofstream o(f.path);
+        o << "@let ENABLE=0\n"
+                "@require ${ENABLE}\n"
+                "@use 2\n";
+    }
+    EXPECT_THROW(p.parse_file(f.path), std::runtime_error);
+}
+
+// --- REQUIRE: comparaisons ---
+TEST(Hamon, RequireComparisons) {
+    HamonParser p;
+    TmpFile f("req3.hc");
+    {
+        std::ofstream o(f.path);
+        o << "@let N=4\n"
+                "@require ${N} == 4\n"
+                "@require ${N} >= 2\n"
+                "@require ${N} <  10\n"
+                "@use 4\n";
+    }
+    EXPECT_NO_THROW(p.parse_file(f.path));
+    EXPECT_NO_THROW(p.finalize());
+}
+
+// --- INCLUDE: boucle détectée ---
+TEST(Hamon, IncludeCircularDetected) {
+    HamonParser p;
+    TmpFile a("a.hc");
+    TmpFile b("b.hc");
+    {
+        std::ofstream oa(a.path);
+        oa << "@include \"" << b.path << "\"\n";
+    }
+    {
+        std::ofstream ob(b.path);
+        ob << "@include \"" << a.path << "\"\n";
+    }
+    EXPECT_THROW(p.parse_file(a.path), std::runtime_error);
+}
