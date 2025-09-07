@@ -7,7 +7,7 @@ set(GCC_WARNING_FLAGS
         -Wall                   # Le grand classique, active beaucoup de warnings utiles
         -Wextra                 # Active encore plus de warnings
         -Wpedantic              # S'assure que le code est strictement standard
-        -Wshadow                # Prévient le "shadowing" de variables (ex: une variable locale qui masque une variable globale)
+        -Wshadow                # Prévient le "shadowing" de variables (ex: une variable locale qui masq        ue une variable globale)
         -Wformat=2              # Vérifications de sécurité sur les chaînes de format (printf, etc.)
         -Wconversion            # Avertit sur les conversions implicites qui peuvent perdre des données
         -Wsign-conversion       # Avertit sur les conversions entre types signés/non-signés
@@ -15,14 +15,14 @@ set(GCC_WARNING_FLAGS
 )
 # Applique ces options à toutes les cibles du projet
 
-add_library(cube STATIC HamonCube.cpp HamonCube.h HamonNode.cpp HamonNode.h Hamon.cpp Hamon.h)
+add_library(cube STATIC HamonCube.cpp HamonCube.hpp HamonNode.cpp HamonNode.hpp Hamon.cpp Hamon.hpp)
 target_compile_options(cube PRIVATE ${GCC_WARNING_FLAGS})
 add_executable(hamon main.cpp)
 target_compile_options(hamon PRIVATE ${GCC_WARNING_FLAGS})
 target_link_libraries(hamon cube)
 
 install(TARGETS hamon DESTINATION bin)
-install(FILES HamonCube.h DESTINATION include)
+install(FILES HamonCube.hpp DESTINATION include)
 install(TARGETS cube DESTINATION lib)
 
 # Active la fonctionnalité de test de CMake

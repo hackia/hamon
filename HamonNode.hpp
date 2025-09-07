@@ -1,6 +1,6 @@
 #pragma once
 
-#include "HamonCube.h"
+#include "HamonCube.hpp"
 #include <map>
 #include <string>
 #include <iostream>

@@ -1,9 +1,10 @@
 #include <gtest/gtest.h>
-#include "../HamonNode.h"
+#include "../HamonNode.hpp"
 
 using namespace Dualys;
 
-TEST(HamonNodeLogicTest, Serialization) {
+TEST(HamonNodeLogicTest, Serialization)
+{
     // ARRANGE
     WordCountMap counts;
     counts["hello"] = 2;
@@ -19,7 +20,8 @@ TEST(HamonNodeLogicTest, Serialization) {
     EXPECT_TRUE(case1 || case2);
 }
 
-TEST(HamonNodeLogicTest, DeserializationAndMerge) {
+TEST(HamonNodeLogicTest, DeserializationAndMerge)
+{
     // ARRANGE
     Dualys::WordCountMap counts;
     counts["existing"] = 5;
@@ -30,8 +32,7 @@ TEST(HamonNodeLogicTest, DeserializationAndMerge) {
     HamonNode::deserialize_and_merge_map(data_to_merge, counts);
     // ASSERT
     EXPECT_EQ(counts["existing"], 7); // 5 + 2
-    EXPECT_EQ(counts["another"], 3); // N'a pas changé
-    EXPECT_EQ(counts["new"], 10); // A été ajouté
+    EXPECT_EQ(counts["another"], 3);  // N'a pas changé
+    EXPECT_EQ(counts["new"], 10);     // A été ajouté
     EXPECT_EQ(counts.size(), 3);
 }
-

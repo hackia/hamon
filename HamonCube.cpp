@@ -1,4 +1,4 @@
-#include "HamonCube.h"
+#include "HamonCube.hpp"
 #include <stdexcept>
 
 using namespace Dualys;

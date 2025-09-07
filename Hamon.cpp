@@ -1,6 +1,7 @@
-#include "Hamon.h"
-
+#include "Hamon.hpp"
 #include <regex>
+#include <algorithm>
+#include <ranges>
 
 using namespace Dualys;
 namespace fs = std::filesystem;
@@ -421,10 +422,10 @@ void HamonParser::finalize() {
     for (int id = 0; id < nodes; ++id) {
         auto &n = *config[static_cast<std::size_t>(id)];
         // supprimer doublons
-        std::ranges::sort(n.neighbors);
-        n.neighbors.erase(std::ranges::unique(n.neighbors).begin(), n.neighbors.end());
+        std::sort(n.neighbors.begin(), n.neighbors.end());
+        n.neighbors.erase(std::unique(n.neighbors.begin(), n.neighbors.end()), n.neighbors.end());
         // pas d’auto-voisin
-        std::erase(n.neighbors, id);
+        n.neighbors.erase(std::remove(n.neighbors.begin(), n.neighbors.end(), id), n.neighbors.end());
         // vérifier bornes
         for (const int v: n.neighbors) {
             if (v < 0 || v >= nodes) {
@@ -432,8 +433,6 @@ void HamonParser::finalize() {
             }
         }
     }
-
-    // pour d’autres topologies, on laisse @neighbors custom s’ils sont fournis (sinon isolé)
 }
 
 int HamonParser::dim() const {

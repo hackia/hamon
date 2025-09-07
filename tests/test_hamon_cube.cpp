@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
-#include "../HamonCube.h"
-
+#include "../HamonCube.hpp"
 using namespace Dualys;
 
-TEST(HamonCubeTest, Handles8NodeCube) {
+TEST(HamonCubeTest, Handles8NodeCube)
+{
     constexpr int node_count = 8;
     const HamonCube cube(node_count);
 
@@ -11,14 +11,16 @@ TEST(HamonCubeTest, Handles8NodeCube) {
     ASSERT_EQ(cube.getDimension(), 3);
 }
 
-TEST(HamonCubeTest, CorrectNeighborsForNode5) {
+TEST(HamonCubeTest, CorrectNeighborsForNode5)
+{
     const HamonCube cube(8);
     const auto &[id, neighbors] = cube.getNode(5);
     ASSERT_EQ(neighbors.size(), 3);
     ASSERT_EQ(id, 5);
 }
 
-TEST(HamonCubeTest, ThrowsOnInvalidNodeCount) {
+TEST(HamonCubeTest, ThrowsOnInvalidNodeCount)
+{
     EXPECT_THROW(Dualys::HamonCube(7), std::invalid_argument);
     EXPECT_THROW(Dualys::HamonCube(0), std::invalid_argument);
     EXPECT_THROW(Dualys::HamonCube(-8), std::invalid_argument);
