@@ -1,7 +1,4 @@
 #include "Hamon.hpp"
-#include <regex>
-#include <algorithm>
-#include <ranges>
 
 using namespace Dualys;
 namespace fs = std::filesystem;
