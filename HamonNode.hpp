@@ -3,23 +3,13 @@
 #include "HamonCube.hpp"
 #include <map>
 #include <string>
-#include <iostream>
 #include <vector>
-#include <fstream>
-#include <sstream>
-#include <thread>
 #include <chrono>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
-namespace Dualys
-{
+namespace Dualys {
     using WordCountMap = std::map<std::string, int>;
 
-    class HamonNode
-    {
+    class HamonNode {
     public:
         /**
          * @brief Build the node's adjacency (neighbors for each node).
@@ -35,6 +25,7 @@ namespace Dualys
          * @param p_configs A vector of NodeConfig instances containing configuration details for all nodes
          */
         HamonNode(const Node &p_topology_node, const HamonCube &p_cube, const std::vector<NodeConfig> &p_configs);
+
         /**
          * @brief Print the final word count results to the console.
          */
@@ -59,12 +50,14 @@ namespace Dualys
          * @return true if all operations were successful, false otherwise.
          */
         bool run();
+
         /**
          * @brief Serialize a WordCountMap to a string.
          * @param target_map The WordCountMap to serialize.
          * @return A string representation of the WordCountMap.
          */
         static std::string serialize_map(const WordCountMap &target_map);
+
         /**
          * @brief Deserialize a string to a WordCountMap and merge it with an existing map.
          * @param x The string representation of the WordCountMap to deserialize.
@@ -82,6 +75,7 @@ namespace Dualys
          * @note This function splits the text chunk into words based on whitespace and counts occurrences of each word.
          */
         [[nodiscard]] WordCountMap perform_word_count_task(const std::string &text_chunk) const;
+
         /**
          * @brief Set up the server socket for incoming connections.
          * @return true if the server was set up successfully, false otherwise.
@@ -104,6 +98,7 @@ namespace Dualys
          * @return The received string.
          */
         static std::string receive_string(int client_socket);
+
         /**
          * @brief Perform the reduce operation by aggregating word counts from neighbor nodes.
          * @return true if the reduction was successful, false otherwise.
@@ -111,6 +106,7 @@ namespace Dualys
          *       receives their aggregated results, and combines them with the local results.
          */
         [[nodiscard]] bool reduce();
+
         /**
          * @brief Read the entire content of a file into a string.
          * @param filename The name of the file to read.

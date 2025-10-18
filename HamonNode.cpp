@@ -2,17 +2,28 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <iostream>
+#include <thread>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 using namespace Dualys;
 using namespace std::chrono_literals;
 
+void HamonNode::initializeTopology() {
+    // Initialize any topology-related state
+    is_master = (topology_node.id == 0);
+    port = all_configs[static_cast<size_t>(topology_node.id)].port;
+}
+
 // --- Constructeur Corrigé ---
 HamonNode::HamonNode(const Node &p_topology_node, const HamonCube &p_cube, const std::vector<NodeConfig> &p_configs)
     : topology_node(p_topology_node)
-    , cube(p_cube)
-    , server_fd(-1)
-    , all_configs(p_configs)
-{
+      , cube(p_cube)
+      , server_fd(-1)
+      , port(0), is_master(false), all_configs(p_configs) {
 }
 
 // --- Fonctions d'implémentation (certaines manquaient) ---
@@ -55,7 +66,7 @@ void HamonNode::send_string(const int sock, const std::string &str) {
     send(sock, str.c_str(), str.size(), 0);
 }
 
-std::string HamonNode::receive_string(int client_socket) {
+std::string HamonNode::receive_string(const int client_socket) {
     uint32_t len = 0;
     if (read(client_socket, &len, sizeof(len)) != sizeof(len)) return "";
     len = ntohl(len);
@@ -93,8 +104,7 @@ void HamonNode::deserialize_and_merge_map(const std::string &x, WordCountMap &ma
     std::string segment;
     while (std::getline(ss, segment, ',')) {
         if (segment.empty()) continue;
-        size_t colon_pos = segment.find(':');
-        if (colon_pos != std::string::npos) {
+        if (const size_t colon_pos = segment.find(':'); colon_pos != std::string::npos) {
             std::string word = segment.substr(0, colon_pos);
             const int count = std::stoi(segment.substr(colon_pos + 1));
             map[word] += count;
@@ -183,7 +193,7 @@ bool HamonNode::reduce() {
         const NodeConfig &partner_config = all_configs[static_cast<size_t>(partner_id)];
 
         if (topology_node.id > partner_id) {
-            int client_sock = socket(AF_INET, SOCK_STREAM, 0);
+            const int client_sock = socket(AF_INET, SOCK_STREAM, 0);
             sockaddr_in serv_addr{};
             serv_addr.sin_family = AF_INET;
             serv_addr.sin_port = htons(static_cast<uint16_t>(partner_config.port));
@@ -209,8 +219,7 @@ bool HamonNode::reduce() {
 
         sockaddr_in client_addr{};
         socklen_t addrlen = sizeof(client_addr);
-        int client_socket = accept(server_fd, reinterpret_cast<sockaddr *>(&client_addr), &addrlen);
-        if (client_socket >= 0) {
+        if (const int client_socket = accept(server_fd, reinterpret_cast<sockaddr *>(&client_addr), &addrlen); client_socket >= 0) {
             std::string received_str_map = receive_string(client_socket);
             deserialize_and_merge_map(received_str_map, local_counts);
             close(client_socket);
