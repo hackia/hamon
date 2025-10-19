@@ -60,11 +60,11 @@ namespace Dualys {
                 CPU_SET(static_cast<unsigned>(cpu), &set);
                 if (sched_setaffinity(0, sizeof(set), &set) != 0) {
                     // best-effort: continue even if it fails
-                    _exit(127);
+                    // Do not exit; proceed to execute the command without pinning
                 }
             }
             // Exec via /bin/sh -c to avoid manual argv parsing
-            execl("/bin/sh", "sh", "-c", cmd.c_str(), (char*)nullptr);
+            execl("/bin/sh", "sh", "-c", cmd.c_str(), static_cast<char *>(nullptr));
             _exit(127);
         }
         int status = 0;
