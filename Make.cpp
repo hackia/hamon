@@ -30,24 +30,41 @@ namespace Dualys {
         int node_id = -1; // -1 if not mapped
     };
 
-    // Simple console progress bar (with optional description on the right)
-    static void print_progress(size_t done, size_t total, std::ostream &log, const std::string &desc = std::string()) {
+    // One-line console progress bar with stdout/stderr paths and context
+    // Format: [ stdout ] [ stderr ] [#####-----] 15% desc cmd
+    static void print_progress(size_t done, size_t total, std::ostream &log,
+                               const std::string &desc = std::string(),
+                               const std::string &cmd = std::string(),
+                               const std::string &stdout_path = std::string(),
+                               const std::string &stderr_path = std::string()) {
         if (total == 0) return;
-        const size_t width = 40;
+        const size_t width = 20; // reasonable default for terminal widths
         double ratio = static_cast<double>(done) / static_cast<double>(total);
         if (ratio < 0) ratio = 0;
         if (ratio > 1) ratio = 1;
         size_t filled = static_cast<size_t>(ratio * width + 0.5);
-        log << "\r[";
-        for (size_t i = 0; i < width; ++i) log << (i < filled ? '#' : '-');
+
+        // Build bar
+        std::ostringstream bar;
+        for (size_t i = 0; i < width; ++i) bar << (i < filled ? '#' : '-');
         int percent = static_cast<int>(ratio * 100.0 + 0.5);
-        log << "] " << percent << "% (" << done << "/" << total << ")";
-        if (!desc.empty()) {
-            std::string d = desc;
-            const size_t max_desc = 60ul;
-            if (d.size() > max_desc) { d.resize(max_desc > 3 ? max_desc - 3 : max_desc); d += "..."; }
-            log << " - " << d;
-        }
+
+        // Trim long desc/cmd to keep the line readable
+        auto trim_to = [](std::string s, size_t n) {
+            if (n == 0) return std::string();
+            if (s.size() <= n) return s;
+            if (n <= 3) return s.substr(0, n);
+            return s.substr(0, n - 3) + "...";
+        };
+
+        const size_t max_desc = 60ul;
+        const size_t max_cmd  = 80ul;
+        std::string d = trim_to(desc, max_desc);
+        std::string c = trim_to(cmd, max_cmd);
+
+        log << "\r[ " << stdout_path << " ] [ " << stderr_path << " ] [" << bar.str() << "] "
+            << percent << "% " << d;
+        if (!c.empty()) log << " $ " << c;
         log << std::flush;
     }
 
@@ -206,7 +223,7 @@ namespace Dualys {
                     return false;
                 }
                 ++done_tasks;
-                print_progress(done_tasks, total_tasks, log, compiles[i].desc);
+                print_progress(done_tasks, total_tasks, log, compiles[i].desc, compiles[i].cmd, compiles[i].stdout_path, compiles[i].stderr_path);
             }
         }
 
@@ -222,7 +239,7 @@ namespace Dualys {
                 return false;
             }
             ++done_tasks;
-            print_progress(done_tasks, total_tasks, log, item.desc);
+            print_progress(done_tasks, total_tasks, log, item.desc, item.cmd, item.stdout_path, item.stderr_path);
         }
 
         log << "\n[Make] All tasks completed successfully." << '\n';
