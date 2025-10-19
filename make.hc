@@ -11,7 +11,7 @@
   @phase CompileCPP by=[0] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -c Hamon.cpp -o Hamon.o"
   @phase CompileCPP by=[1] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -c HamonCube.cpp -o HamonCube.o"
   @phase CompileCPP by=[2] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -c HamonNode.cpp -o HamonNode.o"
-  @phase CompileCPP by=[2] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -c Make.cpp -o Make.o"
+  @phase CompileCPP by=[3] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -c Make.cpp -o Make.o"
   @phase CompileCPP by=[3] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -c main.cpp -o main.o"
   @phase LinkExecutable to=[0] task="g++ *.o -o hamon"
 @end

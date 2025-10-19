@@ -8,7 +8,6 @@
 #include <sys/wait.h>
 #include <thread>
 #include <cmath>
-#include <stdexcept>
 
 using namespace Dualys;
 
