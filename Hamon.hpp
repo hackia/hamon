@@ -23,6 +23,7 @@ namespace Dualys {
     struct Phase {
         std::string name;
         std::string task; // La commande à exécuter
+        std::string description; // Description optionnelle à afficher dans la progress bar
         std::vector<int> target_nodes; // IDs des nœuds concernés
         // Optionnel: could store selector kind if needed later
     };

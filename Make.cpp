@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sched.h>
+#include <fcntl.h>
 
 namespace Dualys {
 
@@ -22,11 +23,15 @@ namespace Dualys {
 
     struct RunItem {
         std::string cmd;
+        std::string desc;
+        std::string stdout_path;
+        std::string stderr_path;
+        int id = -1;
         int node_id = -1; // -1 if not mapped
     };
 
-    // Simple console progress bar
-    static void print_progress(size_t done, size_t total, std::ostream &log) {
+    // Simple console progress bar (with optional description on the right)
+    static void print_progress(size_t done, size_t total, std::ostream &log, const std::string &desc = std::string()) {
         if (total == 0) return;
         const size_t width = 40;
         double ratio = static_cast<double>(done) / static_cast<double>(total);
@@ -36,7 +41,14 @@ namespace Dualys {
         log << "\r[";
         for (size_t i = 0; i < width; ++i) log << (i < filled ? '#' : '-');
         int percent = static_cast<int>(ratio * 100.0 + 0.5);
-        log << "] " << percent << "% (" << done << "/" << total << ")" << std::flush;
+        log << "] " << percent << "% (" << done << "/" << total << ")";
+        if (!desc.empty()) {
+            std::string d = desc;
+            const size_t max_desc = 60ul;
+            if (d.size() > max_desc) { d.resize(max_desc > 3 ? max_desc - 3 : max_desc); d += "..."; }
+            log << " - " << d;
+        }
+        log << std::flush;
     }
 
     static int infer_logical_cpu(const std::unordered_map<int, NodeCfg> &nodes_by_id, int node_id) {
@@ -59,7 +71,7 @@ namespace Dualys {
         return static_cast<int>(logical);
     }
 
-    static int run_with_affinity(const std::string &cmd, const std::unordered_map<int, NodeCfg> &nodes_by_id, int node_id, std::ostream &log) {
+    static int run_with_affinity(const std::string &cmd, const std::unordered_map<int, NodeCfg> &nodes_by_id, int node_id, std::ostream &log, const std::string &out_path, const std::string &err_path) {
         int cpu = infer_logical_cpu(nodes_by_id, node_id);
         pid_t pid = fork();
         if (pid < 0) {
@@ -76,6 +88,15 @@ namespace Dualys {
                     // best-effort: continue even if it fails
                     // Do not exit; proceed to execute the command without pinning
                 }
+            }
+            // Redirect stdout/stderr to files
+            if (!out_path.empty()) {
+                int fd = ::open(out_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                if (fd >= 0) { ::dup2(fd, STDOUT_FILENO); ::close(fd); }
+            }
+            if (!err_path.empty()) {
+                int fd = ::open(err_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                if (fd >= 0) { ::dup2(fd, STDERR_FILENO); ::close(fd); }
             }
             // Exec via /bin/sh -c to avoid manual argv parsing
             execl("/bin/sh", "sh", "-c", cmd.c_str(), static_cast<char *>(nullptr));
@@ -116,13 +137,20 @@ namespace Dualys {
         for (const auto &job : jobs) {
             for (const auto &ph : job.phases) {
                 const std::string expanded = parser.expand_vars(ph.task);
+                const std::string d = parser.expand_vars(ph.description.empty() ? ph.name : ph.description);
                 // For each target node, create a run item (if no targets, -1)
                 if (ph.target_nodes.empty()) {
-                    RunItem it{expanded, -1};
+                    RunItem it;
+                    it.cmd = expanded;
+                    it.desc = d;
+                    it.node_id = -1;
                     if (expanded.find(" -c ") != string::npos || expanded.rfind(" -c", expanded.size() - 2) != string::npos) compiles.push_back(it); else others.push_back(it);
                 } else {
                     for (int nid : ph.target_nodes) {
-                        RunItem it{expanded, nid};
+                        RunItem it;
+                        it.cmd = expanded;
+                        it.desc = d;
+                        it.node_id = nid;
                         if (expanded.find(" -c ") != string::npos || expanded.rfind(" -c", expanded.size() - 2) != string::npos) compiles.push_back(it); else others.push_back(it);
                     }
                 }
@@ -132,6 +160,20 @@ namespace Dualys {
             log << "[hamon] No tasks found in: " << hc_path << '\n';
             return false;
         }
+
+        // Prepare logs directories and assign IDs
+        std::filesystem::create_directories("stdout");
+        std::filesystem::create_directories("stderr");
+        int next_id = 1;
+        auto assign_meta = [&](std::vector<RunItem> &v){
+            for (auto &it : v) {
+                it.id = next_id++;
+                it.stdout_path = std::string("stdout/") + std::to_string(it.id) + ".log";
+                it.stderr_path = std::string("stderr/") + std::to_string(it.id) + ".log";
+            }
+        };
+        assign_meta(compiles);
+        assign_meta(others);
 
         // Prepare overall progress
         const size_t total_tasks = compiles.size() + others.size();
@@ -149,11 +191,11 @@ namespace Dualys {
             for (size_t i = 0; i < compiles.size(); ++i) {
                 const auto item = compiles[i];
                 int cpu = infer_logical_cpu(nodes_by_id, item.node_id);
-                if (cpu >= 0) log << "[Make][C][" << (i + 1) << "/" << compiles.size() << "] pin cpu=" << cpu << " nid=" << item.node_id << " $ " << item.cmd << '\n';
-                else log << "[Make][C][" << (i + 1) << "/" << compiles.size() << "] $ " << item.cmd << '\n';
+                if (cpu >= 0) log << "[Make][C][" << (i + 1) << "/" << compiles.size() << "] pin cpu=" << cpu << " nid=" << item.node_id << " $ " << item.cmd << "\n  -> logs: " << item.stdout_path << ", " << item.stderr_path << '\n';
+                else log << "[Make][C][" << (i + 1) << "/" << compiles.size() << "] $ " << item.cmd << "\n  -> logs: " << item.stdout_path << ", " << item.stderr_path << '\n';
                 auto nodes_copy = nodes_by_id; // capture by value for async task
                 futures.emplace_back(std::async(std::launch::async, [item, nodes_copy]() {
-                    return run_with_affinity(item.cmd, nodes_copy, item.node_id, cout);
+                    return run_with_affinity(item.cmd, nodes_copy, item.node_id, cout, item.stdout_path, item.stderr_path);
                 }));
             }
             // Wait and check
@@ -164,7 +206,7 @@ namespace Dualys {
                     return false;
                 }
                 ++done_tasks;
-                print_progress(done_tasks, total_tasks, log);
+                print_progress(done_tasks, total_tasks, log, compiles[i].desc);
             }
         }
 
@@ -172,15 +214,15 @@ namespace Dualys {
         for (size_t i = 0; i < others.size(); ++i) {
             const auto &item = others[i];
             int cpu = infer_logical_cpu(nodes_by_id, item.node_id);
-            if (cpu >= 0) log << "\n[Make][S][" << (i + 1) << "/" << others.size() << "] pin cpu=" << cpu << " nid=" << item.node_id << " $ " << item.cmd << '\n';
-            else log << "\n[Make][S][" << (i + 1) << "/" << others.size() << "] $ " << item.cmd << '\n';
-            int rc = run_with_affinity(item.cmd, nodes_by_id, item.node_id, log);
+            if (cpu >= 0) log << "\n[Make][S][" << (i + 1) << "/" << others.size() << "] pin cpu=" << cpu << " nid=" << item.node_id << " $ " << item.cmd << "\n  -> logs: " << item.stdout_path << ", " << item.stderr_path << '\n';
+            else log << "\n[Make][S][" << (i + 1) << "/" << others.size() << "] $ " << item.cmd << "\n  -> logs: " << item.stdout_path << ", " << item.stderr_path << '\n';
+            int rc = run_with_affinity(item.cmd, nodes_by_id, item.node_id, log, item.stdout_path, item.stderr_path);
             if (rc != 0) {
                 log << "[Make] Command failed with code " << rc << ": " << item.cmd << '\n';
                 return false;
             }
             ++done_tasks;
-            print_progress(done_tasks, total_tasks, log);
+            print_progress(done_tasks, total_tasks, log, item.desc);
         }
 
         log << "\n[Make] All tasks completed successfully." << '\n';

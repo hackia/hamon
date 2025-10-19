@@ -337,6 +337,14 @@ void HamonParser::parse_line(const std::string &line) {
                 if (m.size() >= 2) ph.task = m[1].str();
             }
         }
+        // extract optional desc="..."
+        {
+            static const std::regex descRe(R"_HC(\bdesc\s*=\s*\"([^\"]*)\")_HC");
+            std::smatch m;
+            if (std::regex_search(rest, m, descRe)) {
+                if (m.size() >= 2) ph.description = m[1].str();
+            }
+        }
         if (ph.task.empty()) bad("@phase missing task=\"...\"");
         // extract by=[...] or to=[...]
         {
