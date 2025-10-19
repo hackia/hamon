@@ -7,15 +7,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <iostream>
-#include <vector>
-#include <algorithm>
-#include <cctype>
-#include <ranges>
-#include <fstream>
 #include <regex>
-#include <sstream>
-#include <stdexcept>
 
 namespace Dualys {
     struct NodeCfg {

@@ -1,21 +1,9 @@
 #pragma once
 
-#include <iostream>
 #include <vector>
 #include <string>
-#include <thread>
-#include <cmath>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+
 #include <chrono>
-#include <iostream>
-#include <vector>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <thread>
 
 namespace Dualys {
     /**

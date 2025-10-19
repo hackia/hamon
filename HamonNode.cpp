@@ -1,6 +1,7 @@
 #include "HamonNode.hpp"
 #include <fstream>
 #include <sstream>
+#include <utility>
 #include <vector>
 #include <iostream>
 #include <thread>
@@ -8,6 +9,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <chrono>
 
 using namespace Dualys;
 using namespace std::chrono_literals;
@@ -19,9 +21,9 @@ void HamonNode::initializeTopology() {
 }
 
 // --- Constructeur Corrigé ---
-HamonNode::HamonNode(const Node &p_topology_node, const HamonCube &p_cube, const std::vector<NodeConfig> &p_configs)
-    : topology_node(p_topology_node)
-      , cube(p_cube)
+HamonNode::HamonNode(Node p_topology_node, HamonCube p_cube, const std::vector<NodeConfig> &p_configs)
+    : topology_node(std::move(p_topology_node))
+      , cube(std::move(p_cube))
       , server_fd(-1)
       , port(0), is_master(false), all_configs(p_configs) {
 }
@@ -60,7 +62,7 @@ bool HamonNode::close_server_socket() const {
 }
 
 void HamonNode::send_string(const int sock, const std::string &str) {
-    const uint32_t payload_len = static_cast<uint32_t>(str.size());
+    const auto payload_len = static_cast<uint32_t>(str.size());
     const uint32_t net_len = htonl(payload_len);
     send(sock, &net_len, sizeof(net_len), 0);
     send(sock, str.c_str(), str.size(), 0);

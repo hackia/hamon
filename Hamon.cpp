@@ -1,5 +1,13 @@
 #include "Hamon.hpp"
-
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <cctype>
+#include <ranges>
+#include <fstream>
+#include <sstream>
+#include <stdexcept>
+#include <filesystem>
 using namespace Dualys;
 namespace fs = std::filesystem;
 
@@ -24,7 +32,7 @@ std::vector<std::string> HamonParser::split_ws(const std::string &line) {
     std::vector<std::string> tokens;
     std::istringstream iss(line);
     std::string tok;
-    while (iss >> tok) tokens.push_back(tok);
+    while (iss >> tok) tokens.push_back(std::move(tok));
     return tokens;
 }
 
@@ -107,7 +115,7 @@ void HamonParser::parse_file(const std::string &path) {
     if (!fs::exists(p)) bad("Failed to open file: " + p.string());
 
     std::string key = p.string();
-    if (include_guard.count(key)) {
+    if (include_guard.contains(key)) {
         bad("Circular include detected: " + key);
     }
 
@@ -184,9 +192,6 @@ void HamonParser::parse_line(const std::string &line) {
         // 4) base = dossier du fichier courant; fallback = cwd
         fs::path base = file_stack.empty() ? fs::current_path() : file_stack.back().parent_path();
         fs::path target = fs::absolute(base / rest);
-
-        // Debug utile si un jour ça recasse (tu peux laisser ou commenter)
-        // std::cerr << "[include] base=" << base << " rest=" << rest << " target=" << target << "\n";
 
         if (!fs::exists(target)) {
             bad(std::string("@include file not found: ") + target.string() +
@@ -419,10 +424,10 @@ void HamonParser::finalize() {
     for (int id = 0; id < nodes; ++id) {
         auto &n = *config[static_cast<std::size_t>(id)];
         // supprimer doublons
-        std::sort(n.neighbors.begin(), n.neighbors.end());
-        n.neighbors.erase(std::unique(n.neighbors.begin(), n.neighbors.end()), n.neighbors.end());
+        std::ranges::sort(n.neighbors);
+        n.neighbors.erase(std::ranges::unique(n.neighbors).begin(), n.neighbors.end());
         // pas d’auto-voisin
-        n.neighbors.erase(std::remove(n.neighbors.begin(), n.neighbors.end(), id), n.neighbors.end());
+        std::erase(n.neighbors, id);
         // vérifier bornes
         for (const int v: n.neighbors) {
             if (v < 0 || v >= nodes) {

@@ -1,5 +1,13 @@
 #include "HamonCube.hpp"
 #include <stdexcept>
+#include <iostream>
+#include <vector>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <thread>
+#include <cmath>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 using namespace Dualys;
 

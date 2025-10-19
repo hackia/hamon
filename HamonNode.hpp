@@ -4,7 +4,6 @@
 #include <map>
 #include <string>
 #include <vector>
-#include <chrono>
 
 namespace Dualys {
     using WordCountMap = std::map<std::string, int>;
@@ -24,7 +23,7 @@ namespace Dualys {
          * @param p_cube The HamonCube instance representing the overall hypercube structure.
          * @param p_configs A vector of NodeConfig instances containing configuration details for all nodes
          */
-        HamonNode(const Node &p_topology_node, const HamonCube &p_cube, const std::vector<NodeConfig> &p_configs);
+        HamonNode(Node p_topology_node, HamonCube p_cube, const std::vector<NodeConfig> &p_configs);
 
         /**
          * @brief Print the final word count results to the console.

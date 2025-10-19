@@ -32,7 +32,7 @@ std::vector<NodeConfig> generate_configs(const int node_count) {
 }
 
 static bool is_power_of_two(const int x) {
-    return x > 0 && (x & (x - 1)) == 0;
+    return x > 0 && (x & x - 1) == 0;
 }
 
 static std::vector<NodeConfig> configs_from_hc(const std::string &hc_path, int &out_node_count) {
@@ -50,7 +50,7 @@ static std::vector<NodeConfig> configs_from_hc(const std::string &hc_path, int &
         c.id = n.id;
         c.role = n.role.empty() ? (n.id == 0 ? "coordinator" : "worker") : n.role;
         c.ip_address = n.host.empty() ? std::string("127.0.0.1") : n.host;
-        c.port = n.port < 0 ? (8000 + n.id) : n.port;
+        c.port = n.port < 0 ? 8000 + n.id : n.port;
         cfgs.push_back(c);
     }
     out_node_count = static_cast<int>(cfgs.size());
