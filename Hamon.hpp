@@ -20,6 +20,19 @@ namespace Dualys {
         std::vector<int> neighbors; // logical neighbors (ids)
     };
 
+    struct Phase {
+        std::string name;
+        std::string task; // La commande à exécuter
+        std::vector<int> target_nodes; // IDs des nœuds concernés
+        // Optionnel: could store selector kind if needed later
+    };
+
+    struct Job {
+        std::string name;
+        std::string input; // valeur brute pour l'instant
+        std::vector<Phase> phases; // phases ordonnées
+    };
+
     class HamonParser {
     public:
         HamonParser();
@@ -48,6 +61,9 @@ namespace Dualys {
         std::string expand_vars(const std::string &in) const; // remplace ${VAR}
         bool eval_require_expr(const std::string &raw) const; // évalue @require
 
+        // Jobs access
+        [[nodiscard]] const std::vector<Job>& get_jobs() const { return jobs; }
+
     private:
         // Helpers (purs C++17, sans dépendances)
         static std::string trim(const std::string &x);
@@ -74,6 +90,9 @@ namespace Dualys {
         // Erreur contextualisée
         [[noreturn]] void bad(const std::string &msg) const;
 
+        // Helpers for jobs
+        std::vector<int> parse_target_selector(const std::string &selector) const; // parses [*], [workers], [0,2]
+
         // État courant de parsing
         int nodes = -1; // @use
         int dimensions = -1; // @dim (auto si @use est puissance de 2)
@@ -90,5 +109,9 @@ namespace Dualys {
         std::unordered_set<std::string> include_guard; // chemins absolus visités
         int include_depth = 0;
         const int include_depth_max = 32;
+
+        // Job parsing context
+        std::vector<Job> jobs;
+        int currentJobIndex = -1; // -1 = outside any job
     };
 } // namespace Dualys

@@ -60,6 +60,35 @@ std::vector<int> HamonParser::parse_list_ids(const std::string &src) {
     return result;
 }
 
+std::vector<int> HamonParser::parse_target_selector(const std::string &selector) const {
+    std::string t = trim(selector);
+    if (t.empty() || t.front() != '[' || t.back() != ']') {
+        bad(std::string("Invalid selector format: ") + selector);
+    }
+    std::string content = trim(t.substr(1, t.size() - 2));
+    std::vector<int> out;
+    if (content == "*" || content == "all") {
+        if (nodes < 0) bad("@phase used before @use <N>");
+        out.reserve(static_cast<size_t>(nodes));
+        for (int i = 0; i < nodes; ++i) out.push_back(i);
+        return out;
+    }
+    if (content == "workers") {
+        if (nodes < 0) bad("@phase used before @use <N>");
+        for (int i = 0; i < nodes; ++i) if (i != 0) out.push_back(i);
+        return out;
+    }
+    // explicit list
+    out = parse_list_ids(selector);
+    // validate
+    for (int v : out) {
+        if (v < 0 || (nodes >= 0 && v >= nodes)) {
+            bad(std::string("Target node id out of range: ") + std::to_string(v));
+        }
+    }
+    return out;
+}
+
 void HamonParser::parse_host_port(const std::string &s, std::string &host, int &port) {
     const auto pos = s.find(':');
     if (pos == std::string::npos) {
@@ -267,9 +296,78 @@ void HamonParser::parse_line(const std::string &line) {
         return;
     }
 
-    // Ignore build/job directives (not executed by C++ orchestrator)
-    if (starts_with(s, "@job") || starts_with(s, "@phase") || starts_with(s, "@end")) {
-        return; // no-op for compatibility with make.hc files
+    // ----- Job/Phase DSL -----
+    if (starts_with(s, "@job")) {
+        if (currentJobIndex != -1) bad("@job inside another job");
+        std::string rest = trim(s.substr(std::string("@job").size()));
+        if (rest.empty()) bad("@job expects a name");
+        Job j;
+        j.name = rest;
+        jobs.push_back(std::move(j));
+        currentJobIndex = static_cast<int>(jobs.size()) - 1;
+        return;
+    }
+    if (starts_with(s, "@input")) {
+        if (currentJobIndex == -1) bad("@input used outside of @job");
+        std::string rest = trim(s.substr(std::string("@input").size()));
+        // strip optional quotes
+        if (rest.size() >= 2 && ((rest.front() == '"' && rest.back() == '"') || (rest.front() == '\'' && rest.back() == '\''))) {
+            rest = rest.substr(1, rest.size() - 2);
+        }
+        jobs[static_cast<size_t>(currentJobIndex)].input = expand_vars(rest);
+        return;
+    }
+    if (starts_with(s, "@phase")) {
+        if (currentJobIndex == -1) bad("@phase used outside of @job");
+        std::string rest = trim(s.substr(std::string("@phase").size()));
+        if (rest.empty()) bad("@phase expects a name and attributes");
+        // phase name = first token
+        std::string name;
+        size_t i = 0;
+        while (i < rest.size() && std::isspace(static_cast<unsigned char>(rest[i]))) ++i;
+        size_t j = i;
+        while (j < rest.size() && !std::isspace(static_cast<unsigned char>(rest[j]))) ++j;
+        name = rest.substr(i, j - i);
+        Phase ph;
+        ph.name = name;
+        // extract task="..."
+        {
+            static const std::regex taskRe(R"_HC(\btask\s*=\s*\"([^\"]*)\")_HC");
+            std::smatch m;
+            if (std::regex_search(rest, m, taskRe)) {
+                if (m.size() >= 2) ph.task = m[1].str();
+            }
+        }
+        if (ph.task.empty()) bad("@phase missing task=\"...\"");
+        // extract by=[...] or to=[...]
+        {
+            auto find_selector = [&](const char *key)->std::string {
+                const std::string k = std::string(key) + std::string("=");
+                size_t pos = rest.find(k);
+                if (pos == std::string::npos) return std::string();
+                pos += k.size();
+                // skip spaces
+                while (pos < rest.size() && std::isspace(static_cast<unsigned char>(rest[pos]))) ++pos;
+                if (pos >= rest.size() || rest[pos] != '[') return std::string();
+                size_t end = rest.find(']', pos);
+                if (end == std::string::npos) bad(std::string("Missing closing ']' for ") + key);
+                return rest.substr(pos, end - pos + 1);
+            };
+            std::string sel = find_selector("by");
+            if (sel.empty()) sel = find_selector("to");
+            if (sel.empty()) {
+                // default to all nodes
+                sel = "[*]";
+            }
+            ph.target_nodes = parse_target_selector(sel);
+        }
+        jobs[static_cast<size_t>(currentJobIndex)].phases.push_back(std::move(ph));
+        return;
+    }
+    if (starts_with(s, "@end")) {
+        if (currentJobIndex == -1) bad("@end outside of @job");
+        currentJobIndex = -1;
+        return;
     }
 
     // --- Directives globales ---
