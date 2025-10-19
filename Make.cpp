@@ -36,7 +36,8 @@ namespace Dualys {
                                const std::string &desc = std::string(),
                                const std::string &cmd = std::string(),
                                const std::string &stdout_path = std::string(),
-                               const std::string &stderr_path = std::string()) {
+                               const std::string &stderr_path = std::string(),
+                               int file_id = -1) {
         if (total == 0) return;
         const size_t width = 20; // reasonable default for terminal widths
         double ratio = static_cast<double>(done) / static_cast<double>(total);
@@ -57,13 +58,18 @@ namespace Dualys {
             return s.substr(0, n - 3) + "...";
         };
 
-        const size_t max_desc = 60ul;
-        const size_t max_cmd  = 80ul;
-        std::string d = trim_to(desc, max_desc);
-        std::string c = trim_to(cmd, max_cmd);
+        constexpr size_t max_desc = 60ul;
+        constexpr size_t max_cmd  = 80ul;
+        const std::string d = trim_to(desc, max_desc);
+        const std::string c = trim_to(cmd, max_cmd);
 
-        log << "\r[ " << stdout_path << " ] [ " << stderr_path << " ] [" << bar.str() << "] "
-            << percent << "% " << d;
+        log << "\r";
+        if (file_id >= 1) {
+            log << "[ " << file_id << " ] [ " << file_id << " ] ";
+        } else {
+            log << "[ " << stdout_path << " ] [ " << stderr_path << " ] ";
+        }
+        log << "[" << bar.str() << "] " << percent << "% " << d;
         if (!c.empty()) log << " $ " << c;
         log << std::flush;
     }
@@ -223,7 +229,7 @@ namespace Dualys {
                     return false;
                 }
                 ++done_tasks;
-                print_progress(done_tasks, total_tasks, log, compiles[i].desc, compiles[i].cmd, compiles[i].stdout_path, compiles[i].stderr_path);
+                print_progress(done_tasks, total_tasks, log, compiles[i].desc, compiles[i].cmd, compiles[i].stdout_path, compiles[i].stderr_path, compiles[i].id);
             }
         }
 
@@ -239,7 +245,7 @@ namespace Dualys {
                 return false;
             }
             ++done_tasks;
-            print_progress(done_tasks, total_tasks, log, item.desc, item.cmd, item.stdout_path, item.stderr_path);
+            print_progress(done_tasks, total_tasks, log, item.desc, item.cmd, item.stdout_path, item.stderr_path, item.id);
         }
 
         log << "\n[Make] All tasks completed successfully." << '\n';
