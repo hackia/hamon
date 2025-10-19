@@ -25,6 +25,20 @@ namespace Dualys {
         int node_id = -1; // -1 if not mapped
     };
 
+    // Simple console progress bar
+    static void print_progress(size_t done, size_t total, std::ostream &log) {
+        if (total == 0) return;
+        const size_t width = 40;
+        double ratio = static_cast<double>(done) / static_cast<double>(total);
+        if (ratio < 0) ratio = 0;
+        if (ratio > 1) ratio = 1;
+        size_t filled = static_cast<size_t>(ratio * width + 0.5);
+        log << "\r[";
+        for (size_t i = 0; i < width; ++i) log << (i < filled ? '#' : '-');
+        int percent = static_cast<int>(ratio * 100.0 + 0.5);
+        log << "] " << percent << "% (" << done << "/" << total << ")" << std::flush;
+    }
+
     static int infer_logical_cpu(const std::unordered_map<int, NodeCfg> &nodes_by_id, int node_id) {
         auto it = nodes_by_id.find(node_id);
         if (it == nodes_by_id.end()) return -1;
@@ -119,9 +133,17 @@ namespace Dualys {
             return false;
         }
 
+        // Prepare overall progress
+        const size_t total_tasks = compiles.size() + others.size();
+        size_t done_tasks = 0;
+        if (total_tasks > 0) {
+            log << "[Make] Total tasks: " << total_tasks << " (compile: " << compiles.size() << ", other: " << others.size() << ")\n";
+            print_progress(done_tasks, total_tasks, log);
+        }
+
         // Run compile commands in parallel with affinity
         if (!compiles.empty()) {
-            log << "[Make] Parallel compile jobs: " << compiles.size() << '\n';
+            log << "\n[Make] Parallel compile jobs: " << compiles.size() << '\n';
             vector<future<int>> futures;
             futures.reserve(compiles.size());
             for (size_t i = 0; i < compiles.size(); ++i) {
@@ -141,6 +163,8 @@ namespace Dualys {
                     log << "[Make] Compile command failed with code " << rc << '\n';
                     return false;
                 }
+                ++done_tasks;
+                print_progress(done_tasks, total_tasks, log);
             }
         }
 
@@ -148,16 +172,18 @@ namespace Dualys {
         for (size_t i = 0; i < others.size(); ++i) {
             const auto &item = others[i];
             int cpu = infer_logical_cpu(nodes_by_id, item.node_id);
-            if (cpu >= 0) log << "[Make][S][" << (i + 1) << "/" << others.size() << "] pin cpu=" << cpu << " nid=" << item.node_id << " $ " << item.cmd << '\n';
-            else log << "[Make][S][" << (i + 1) << "/" << others.size() << "] $ " << item.cmd << '\n';
+            if (cpu >= 0) log << "\n[Make][S][" << (i + 1) << "/" << others.size() << "] pin cpu=" << cpu << " nid=" << item.node_id << " $ " << item.cmd << '\n';
+            else log << "\n[Make][S][" << (i + 1) << "/" << others.size() << "] $ " << item.cmd << '\n';
             int rc = run_with_affinity(item.cmd, nodes_by_id, item.node_id, log);
             if (rc != 0) {
                 log << "[Make] Command failed with code " << rc << ": " << item.cmd << '\n';
                 return false;
             }
+            ++done_tasks;
+            print_progress(done_tasks, total_tasks, log);
         }
 
-        log << "[Make] All tasks completed successfully." << '\n';
+        log << "\n[Make] All tasks completed successfully." << '\n';
         return true;
     }
 
