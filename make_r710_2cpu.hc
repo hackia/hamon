@@ -22,16 +22,11 @@
 @job CompileHamon
 
   # Phase 1: Compilation parallèle (OK)
-  @phase CompileCPP by=[0] task="g++ ... -c Hamon.cpp -o Hamon.o"
-  @phase CompileCPP by=[1] task="g++ ... -c HamonCube.cpp -o HamonCube.o"
-  @phase CompileCPP by=[2] task="g++ ... -c HamonNode.cpp -o HamonNode.o"
-  @phase CompileCPP by=[3] task="g++ ... -c Make.cpp -o Make.o"
-  @phase CompileCPP by=[4] task="g++ ... -c main.cpp -o main.o"
-
-  # Phase 2: Transfert des .o (Commenté - OK car FS local)
-  # @phase TransferO ...
-  # @phase WaitForO ...
-
+  @phase CompileCPP by=[0] task="g++ -c Hamon.cpp -o Hamon.o"
+  @phase CompileCPP by=[1] task="g++ -c HamonCube.cpp -o HamonCube.o"
+  @phase CompileCPP by=[2] task="g++ -c HamonNode.cpp -o HamonNode.o"
+  @phase CompileCPP by=[3] task="g++ -c Make.cpp -o Make.o"
+  @phase CompileCPP by=[4] task="g++ -c main.cpp -o main.o"
   # Phase 3: Lien final (OK car FS local)
   @phase LinkExecutable to=[0] task="g++ Hamon.o HamonCube.o HamonNode.o Make.o main.o -o hamon -lpthread"
 
