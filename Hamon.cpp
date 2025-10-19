@@ -3,7 +3,6 @@
 #include <vector>
 #include <algorithm>
 #include <cctype>
-#include <ranges>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -144,7 +143,7 @@ void HamonParser::parse_file(const std::string &path) {
     if (!fs::exists(p)) bad("Failed to open file: " + p.string());
 
     std::string key = p.string();
-    if (include_guard.contains(key)) {
+    if (include_guard.find(key) != include_guard.end()) {
         bad("Circular include detected: " + key);
     }
 
@@ -449,15 +448,18 @@ void HamonParser::parse_line(const std::string &line) {
         // format: @cpu numa=I core=J (ordre libre)
         int numa = ensure_node(currentNodeId).numa;
         int core = ensure_node(currentNodeId).core;
-        for (const auto toks = split_ws(s.substr(std::string("@cpu").size())); auto &t: toks) {
-            const auto eq = t.find('=');
-            if (eq == std::string::npos) continue;
-            auto k = trim(t.substr(0, eq));
-            auto v = trim(t.substr(eq + 1));
-            try {
-                if (k == "numa") numa = std::stoi(v);
-                else if (k == "core") core = std::stoi(v);
-            } catch (...) { bad("Invalid @cpu value"); }
+        {
+            const auto toks = split_ws(s.substr(std::string("@cpu").size()));
+            for (const auto &t : toks) {
+                const auto eq = t.find('=');
+                if (eq == std::string::npos) continue;
+                auto k = trim(t.substr(0, eq));
+                auto v = trim(t.substr(eq + 1));
+                try {
+                    if (k == "numa") numa = std::stoi(v);
+                    else if (k == "core") core = std::stoi(v);
+                } catch (...) { bad("Invalid @cpu value"); }
+            }
         }
         auto &n = ensure_node(currentNodeId);
         n.numa = numa;
@@ -554,10 +556,10 @@ void HamonParser::finalize() {
     for (int id = 0; id < nodes; ++id) {
         auto &n = *config[static_cast<std::size_t>(id)];
         // supprimer doublons
-        std::ranges::sort(n.neighbors);
-        n.neighbors.erase(std::ranges::unique(n.neighbors).begin(), n.neighbors.end());
+        std::sort(n.neighbors.begin(), n.neighbors.end());
+        n.neighbors.erase(std::unique(n.neighbors.begin(), n.neighbors.end()), n.neighbors.end());
         // pas d’auto-voisin
-        std::erase(n.neighbors, id);
+        n.neighbors.erase(std::remove(n.neighbors.begin(), n.neighbors.end(), id), n.neighbors.end());
         // vérifier bornes
         for (const int v: n.neighbors) {
             if (v < 0 || v >= nodes) {
