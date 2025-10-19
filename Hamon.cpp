@@ -267,6 +267,11 @@ void HamonParser::parse_line(const std::string &line) {
         return;
     }
 
+    // Ignore build/job directives (not executed by C++ orchestrator)
+    if (starts_with(s, "@job") || starts_with(s, "@phase") || starts_with(s, "@end")) {
+        return; // no-op for compatibility with make.hc files
+    }
+
     // --- Directives globales ---
     if (starts_with(s, "@use")) {
         const auto toks = split_ws(s);
@@ -298,10 +303,37 @@ void HamonParser::parse_line(const std::string &line) {
 
     // --- Début bloc node ---
     if (starts_with(s, "@node")) {
-        const auto toks = split_ws(s);
-        if (toks.size() != 2) bad("@node expects a single integer id");
-        try { currentNodeId = std::stoi(toks[1]); } catch (...) { bad("@node id must be integer"); }
+        // Accept inline attributes after the id, e.g.:
+        // @node 0 @role coordinator @cpu numa=0 core=0
+        std::string after = trim(s.substr(std::string("@node").size()));
+        if (after.empty()) bad("@node expects a single integer id");
+        // parse id (first token)
+        size_t i = 0;
+        while (i < after.size() && std::isspace(static_cast<unsigned char>(after[i]))) ++i;
+        size_t j = i;
+        while (j < after.size() && !std::isspace(static_cast<unsigned char>(after[j]))) ++j;
+        if (i == j) bad("@node expects a single integer id");
+        const std::string idstr = after.substr(i, j - i);
+        try { currentNodeId = std::stoi(idstr); } catch (...) { bad("@node id must be integer"); }
         (void) ensure_node(currentNodeId); // garantit l'existence
+        // process remaining inline directives, if any
+        std::string rest = trim(after.substr(j));
+        while (!rest.empty()) {
+            size_t k = 0;
+            while (k < rest.size() && std::isspace(static_cast<unsigned char>(rest[k]))) ++k;
+            if (k >= rest.size()) break;
+            if (rest[k] != '@') {
+                bad(std::string("Unexpected token after @node id: ") + rest.substr(k));
+            }
+            size_t m = k + 1;
+            // find next directive start '@' that is separated by whitespace
+            for (; m < rest.size(); ++m) {
+                if (rest[m] == '@' && std::isspace(static_cast<unsigned char>(rest[m - 1]))) break;
+            }
+            const std::string sub = trim(rest.substr(k, m - k));
+            if (!sub.empty()) parse_line(sub);
+            rest = trim(rest.substr(m));
+        }
         return;
     }
 
