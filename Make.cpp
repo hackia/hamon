@@ -88,7 +88,7 @@ namespace Dualys {
             parser.parse_file(hc_path);
             parser.finalize();
         } catch (const std::exception &e) {
-            log << "[Make] Parse error: " << e.what() << '\n';
+            log << "[hamon] Parse error: " << e.what() << '\n';
             return false;
         }
 
@@ -115,7 +115,7 @@ namespace Dualys {
             }
         }
         if (compiles.empty() && others.empty()) {
-            log << "[Make] No tasks found in: " << hc_path << '\n';
+            log << "[hamon] No tasks found in: " << hc_path << '\n';
             return false;
         }
 

@@ -585,20 +585,21 @@ std::vector<NodeCfg> HamonParser::materialize_nodes() const {
 }
 
 void HamonParser::print_plan(std::ostream &os) const {
-    os << "Cluster: " << nodes << " nodes, topology=" << topology;
-    if (topology == "hypercube") os << " (dim=" << dimensions << ")";
-    os << "\n\nNodes:\n";
+    os << "[hamon] Cluster: " << nodes << " nodes; topology=" << topology;
+    if (topology == "hypercube") os << "; dim=" << dimensions;
+    os << "\n[hamon] Nodes:\n";
     for (const auto &opt: config)
         if (opt.has_value()) {
             const auto &[id, role, numa, core, host, port, neighbors] = *opt;
-            os << " - Node " << id
-                    << ": role=" << (role.empty() ? "<unset>" : role)
-                    << ", cpu_core=" << core
-                    << ", numa_node=" << numa
-                    << ", endpoint=" << host << ":" << port
-                    << ", neighbors=[";
+            os << "  • Node " << id
+               << " | role=" << (role.empty() ? "<unset>" : role)
+               << " | core=" << core
+               << " | numa=" << numa
+               << " | endpoint=" << host << ":" << port
+               << " | neighbors=[";
             for (size_t i = 0; i < neighbors.size(); ++i) {
-                os << neighbors[i] << (i + 1 < neighbors.size() ? "," : "");
+                if (i) os << ",";
+                os << neighbors[i];
             }
             os << "]\n";
         }

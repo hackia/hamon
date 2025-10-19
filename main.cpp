@@ -143,12 +143,12 @@ int main(const int argc, char **argv) {
         }
         // Otherwise assume it's an .hc path
         const std::string &hc_path = arg1;
-        std::cout << "Running @phase tasks from '" << hc_path << "'..." << std::endl;
+        std::cout << "[hamon] Running tasks from: " << hc_path << std::endl;
         const bool ok = Make::build_from_hc(hc_path);
         return ok ? 0 : 1;
     }
 
-    std::cout << "Orchestrator starting..." << std::endl;
+    std::cout << "[hamon] Orchestrator starting" << std::endl;
 
     int node_count = 0;
     std::vector<NodeConfig> configs;
@@ -161,7 +161,7 @@ int main(const int argc, char **argv) {
         std::cerr << "Not enough hardware cores detected to run." << std::endl;
         return 1;
     }
-    std::cout << "Detected " << hardware_cores << " cores. Using " << node_count << " nodes." << std::endl;
+    std::cout << "[hamon] Detected " << hardware_cores << " cores; using " << node_count << " nodes" << std::endl;
     configs = generate_configs(node_count);
 
     // 2. Launch child processes
@@ -182,7 +182,7 @@ int main(const int argc, char **argv) {
     }
 
     // 3. Wait for all processes to finish
-    std::cout << "All " << childPids.size() << " nodes launched. Waiting for them to finish." << std::endl;
+    std::cout << "[hamon] Launched " << childPids.size() << " nodes; waiting for completion" << std::endl;
     for (const pid_t pid: childPids) {
         waitpid(pid, nullptr, 0);
     }
