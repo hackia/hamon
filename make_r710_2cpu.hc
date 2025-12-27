@@ -26,22 +26,13 @@
 @node 14 @role worker      @cpu numa=1 core=6
 @node 15 @role worker      @cpu numa=1 core=7
 
-# --- Variables ---
-# Définir les flags une seule fois pour éviter les répétitions
 @let CXXFLAGS = "-std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -O2"
-# -O2 est un bon niveau d'optimisation. Tu peux essayer -O3 pour plus d'optimisation, ou -Og pour le debug.
 
 @job CompileHamon
-
-  # Phase 1: Compilation parallèle avec les flags
-  @phase CompileCPP by=[0] task="g++ ${CXXFLAGS} -c Hamon.cpp -o Hamon.o"
-  @phase CompileCPP by=[1] task="g++ ${CXXFLAGS} -c HamonCube.cpp -o HamonCube.o"
-  @phase CompileCPP by=[2] task="g++ ${CXXFLAGS} -c HamonNode.cpp -o HamonNode.o"
-  @phase CompileCPP by=[3] task="g++ ${CXXFLAGS} -c Make.cpp -o Make.o"
-  @phase CompileCPP by=[4] task="g++ ${CXXFLAGS} -c main.cpp -o main.o"
-
-  # Phase 2: Lien final
-  # On peut aussi ajouter des flags d'optimisation au lien si nécessaire (-O2)
-  @phase LinkExecutable to=[0] task="g++ Hamon.o HamonCube.o HamonNode.o Make.o main.o -o hamon -lpthread -O2"
-
+  @phase Hamon by=[0] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -Iinclude -c src/Hamon.cpp -o Hamon.o"
+  @phase HamonCube by=[1] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -Iinclude -c src/HamonCube.cpp -o HamonCube.o"
+  @phase HamonNode by=[2] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -Iinclude -c src/HamonNode.cpp -o HamonNode.o"
+  @phase Make by=[3] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -Iinclude -c src/Make.cpp -o Make.o"
+  @phase Main by=[0] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -Iinclude -c apps/hamon/main.cpp -o main.o"
+  @phase LinkExecutable to=[0] task="g++ Hamon.o HamonCube.o HamonNode.o Make.o main.o -o hamon"
 @end

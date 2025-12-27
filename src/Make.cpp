@@ -23,7 +23,7 @@ using namespace dualys;
 using namespace std;
 
 // OpenRC style status printing with terminal width detection
-static void print_status(ostream &log, const string &msg, const string &status, bool error = false) {
+static void print_status(ostream &log, const string &msg, const string &status, const bool error = false) {
     winsize w{};
     int term_width = 80;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0 && w.ws_col > 0) {
@@ -34,13 +34,7 @@ static void print_status(ostream &log, const string &msg, const string &status, 
     const string green_star = "\033[32m*\033[0m";
     const string white_bracket_open = "\033[37m[\033[0m";
     const string white_bracket_close = "\033[37m]\033[0m";
-    string status_text;
-
-    if (error)
-        status_text = "\033[31;1m" + status + "\033[0m"; // Bold Red
-    else
-        status_text = "\033[32;1m" + status + "\033[0m"; // Bold Green
-
+    const string status_text = error ? "\033[31;1m" + status + "\033[0m" : "\033[32;1m" + status + "\033[0m";
     const string status_block = " " + white_bracket_open + " " + status_text + " " + white_bracket_close;
     const int msg_display_len = 3 + static_cast<int>(msg.length());
     int padding = term_width - msg_display_len - 7;
@@ -85,7 +79,7 @@ static int run_with_affinity(const std::string &cmd, const std::unordered_map<in
                              const std::string &err_path) {
     const int pid = fork();
     if (pid < 0) {
-        log << "[Make] fork() failed for: " << cmd << "\n";
+        print_status(log, "failed to fork cmd", "!!", true);
         return -1;
     }
     if (pid == 0) {
@@ -117,7 +111,7 @@ static int run_with_affinity(const std::string &cmd, const std::unordered_map<in
     }
     int status = 0;
     if (waitpid(pid, &status, 0) < 0) {
-        log << "[Make] waitpid() failed for: " << cmd << "\n";
+        print_status(log, "failed to wait pid", "!!", true);
         return -1;
     }
     if (WIFEXITED(status)) return WEXITSTATUS(status);
@@ -168,7 +162,7 @@ bool Make::build_from_hc(const string &hc_path, ostream &log) {
         }
     }
     if (compiles.empty() && others.empty()) {
-        log << "[hamon] No tasks found in: " << hc_path << '\n';
+        print_status(log, "No tasks found", "!!", true);
         return false;
     }
 
@@ -188,7 +182,7 @@ bool Make::build_from_hc(const string &hc_path, ostream &log) {
 
     // Prepare overall progress
     if (const size_t total_tasks = compiles.size() + others.size(); total_tasks > 0) {
-        print_status(log, "Starting Hamon Build System...", "ok");
+        print_status(log, "Starting build system...", "ok");
     }
     if (!compiles.empty()) {
         vector<future<int> > futures;
@@ -203,20 +197,20 @@ bool Make::build_from_hc(const string &hc_path, ostream &log) {
 
         for (size_t i = 0; i < futures.size(); ++i) {
             if (int rc = futures[i].get(); rc != 0) {
-                print_status(log, "Compiling: " + compiles[i].desc, "!!", true);
+                print_status(log, compiles[i].desc, "!!", true);
                 return false;
             }
-            print_status(log, "Compiling: " + compiles[i].desc, "ok");
+            print_status(log, compiles[i].desc, "ok");
         }
     }
 
     // Run the remaining tasks sequentially
     for (const auto &[cmd, desc, stdout_path, stderr_path, id, node_id]: others) {
         if (int rc = run_with_affinity(cmd, nodes_by_id, node_id, log, stdout_path, stderr_path); rc != 0) {
-            print_status(log, "Processing: " + desc, "!!", true);
+            print_status(log, desc, "!!", true);
             return false;
         }
-        print_status(log, "Processing: " + desc, "ok");
+        print_status(log, desc, "ok");
     }
     print_status(log, "Build completed successfully", "ok");
     return true;

@@ -138,11 +138,12 @@ int main(const int argc, char **argv) {
             std::cout << _("Run: hamon ") << outp.string() << "\n";
             return 0;
         }
-        // Otherwise assume it's an .hc path
-        const std::string &hc_path = arg1;
-        std::cout << "[hamon] Running tasks from: " << hc_path << std::endl;
-        const bool ok = Make::build_from_hc(hc_path, std::cout);
-        return ok ? 0 : 1;
+        if (std::filesystem::exists(arg1) && !std::filesystem::is_directory(arg1)) {
+            const std::string &hc_path = arg1;
+            const bool ok = Make::build_from_hc(hc_path, std::cout);
+            return ok ? 0 : 1;
+        }
+        return 1;
     }
 
     std::cout << "[hamon] Orchestrator starting" << std::endl;

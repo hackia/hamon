@@ -145,7 +145,7 @@ void HamonParser::parse_file(const std::string &path) {
     if (!fs::exists(p)) bad("Failed to open file: " + p.string());
 
     std::string key = p.string();
-    if (include_guard.find(key) != include_guard.end()) {
+    if (include_guard.contains(key)) {
         bad("Circular include detected: " + key);
     }
 
