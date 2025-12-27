@@ -4,7 +4,6 @@
 #include <fstream>
 #include <iostream>
 #include <regex>
-#include <sstream>
 #include <string>
 #include <vector>
 #include <ranges>
@@ -18,9 +17,39 @@
 #include <cstring>
 #include <csignal>
 #include <cmath>
+#include <sys/ioctl.h>
 
 namespace dualys {
     using namespace std;
+
+    // OpenRC style status printing with terminal width detection
+    static void print_status(ostream &log, const string &msg, const string &status, bool error = false) {
+        winsize w{};
+        int term_width = 80;
+        if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0 && w.ws_col > 0) {
+            term_width = w.ws_col;
+        }
+
+        // Colors: Stars (Green), Brackets (White), Status (Green/Red)
+        const string green_star = "\033[32m*\033[0m";
+        const string white_bracket_open = "\033[37m[\033[0m";
+        const string white_bracket_close = "\033[37m]\033[0m";
+        string status_text;
+
+        if (error)
+            status_text = "\033[31;1m" + status + "\033[0m"; // Bold Red
+        else
+            status_text = "\033[32;1m" + status + "\033[0m"; // Bold Green
+
+        const string status_block = " " + white_bracket_open + " " + status_text + " " + white_bracket_close;
+        const int msg_display_len = 3 + static_cast<int>(msg.length());
+        int padding = term_width - msg_display_len - 7;
+        if (padding < 1) padding = 1;
+
+        log << " " << green_star << " " << msg;
+        for (int i = 0; i < padding; ++i) log << " ";
+        log << status_block << endl;
+    }
 
     struct RunItem {
         std::string cmd;
@@ -30,54 +59,6 @@ namespace dualys {
         int id = -1;
         int node_id = -1; // -1 if not mapped
     };
-
-    // One-line console progress bar with stdout/stderr paths, spinner, and context
-    // Format: [ stdout ] [ stderr ] [|] [#####-----] 15% desc cmd
-    static void print_progress(const size_t done, const size_t total, std::ostream &log,
-                               const std::string &desc = std::string(),
-                               const std::string &cmd = std::string(),
-                               const std::string &stdout_path = std::string(),
-                               const std::string &stderr_path = std::string(),
-                               const int file_id = -1) {
-        if (total == 0) return;
-        constexpr size_t width = 20; // reasonable default for terminal widths
-        double ratio = static_cast<double>(done) / static_cast<double>(total);
-        if (ratio < 0) ratio = 0;
-        if (ratio > 1) ratio = 1;
-        const auto filled = static_cast<size_t>(ratio * width + 0.5);
-
-        // Build bar
-        std::ostringstream bar;
-        for (size_t i = 0; i < width; ++i) bar << (i < filled ? '#' : '-');
-        const int percent = static_cast<int>(ratio * 100.0 + 0.5);
-
-        // Spinner frame (simple ASCII to avoid locale issues)
-        static constexpr char frames[] = {'|', '/', '-', '\\'};
-        const char spinner = frames[(done % std::size(frames))];
-
-        // Trim long desc/cmd to keep the line readable
-        auto trim_to = [](std::string s, const size_t n) {
-            if (n == 0) return std::string();
-            if (s.size() <= n) return s;
-            if (n <= 3) return s.substr(0, n);
-            return s.substr(0, n - 3) + "...";
-        };
-
-        constexpr size_t max_desc = 60ul;
-        constexpr size_t max_cmd = 80ul;
-        const std::string d = trim_to(desc, max_desc);
-        const std::string c = trim_to(cmd, max_cmd);
-
-        log << "\r";
-        if (file_id >= 1) {
-            log << "[ " << file_id << " ] [ " << file_id << " ] ";
-        } else {
-            log << "[ " << stdout_path << " ] [ " << stderr_path << " ] ";
-        }
-        log << "[" << spinner << "] [" << bar.str() << "] " << percent << "% " << d;
-        if (!c.empty()) log << " $ " << c;
-        log << std::flush;
-    }
 
     static int infer_logical_cpu(const std::unordered_map<int, NodeCfg> &nodes_by_id, const int node_id) {
         const auto it = nodes_by_id.find(node_id);
@@ -102,15 +83,14 @@ namespace dualys {
     static int run_with_affinity(const std::string &cmd, const std::unordered_map<int, NodeCfg> &nodes_by_id,
                                  const int node_id, std::ostream &log, const std::string &out_path,
                                  const std::string &err_path) {
-        const int cpu = infer_logical_cpu(nodes_by_id, node_id);
-        const pid_t pid = fork();
+        const int pid = fork();
         if (pid < 0) {
             log << "[Make] fork() failed for: " << cmd << "\n";
             return -1;
         }
         if (pid == 0) {
             // Child: set CPU affinity if available
-            if (cpu >= 0) {
+            if (const int cpu = infer_logical_cpu(nodes_by_id, node_id); cpu >= 0) {
                 cpu_set_t set;
                 CPU_ZERO(&set);
                 CPU_SET(static_cast<unsigned>(cpu), &set);
@@ -212,66 +192,38 @@ namespace dualys {
         assign_meta(others);
 
         // Prepare overall progress
-        const size_t total_tasks = compiles.size() + others.size();
-        size_t done_tasks = 0;
-        if (total_tasks > 0) {
-            log << "[Make] Total tasks: " << total_tasks << " (compile: " << compiles.size() << ", other: " << others.
-                    size() << ")\n";
-            print_progress(done_tasks, total_tasks, log);
+        if (const size_t total_tasks = compiles.size() + others.size(); total_tasks > 0) {
+            print_status(log, "Starting Hamon Build System...", "ok");
         }
-
         if (!compiles.empty()) {
-            log << "\n[Make] Parallel compile jobs: " << compiles.size() << '\n';
-            vector<future<int> > futures;
+            vector<future<int>> futures;
             futures.reserve(compiles.size());
-            for (size_t i = 0; i < compiles.size(); ++i) {
-                const auto &item = compiles[i];
-                if (int cpu = infer_logical_cpu(nodes_by_id, item.node_id); cpu >= 0) {
-                    log << "\r[Make][C][" << (i + 1) << "/" << compiles.size() << "] pin cpu=" << cpu << " nid="
-                            << item.node_id << " $ " << item.cmd << "  -> logs: " << item.stdout_path << ", " <<
-                            item.stderr_path << '\n';
-                } else {
-                    log << "\r[Make][C][" << (i + 1) << "/" << compiles.size() << "] $ " << item.cmd << "  -> logs: "
-                            << item.stdout_path << ", " << item.stderr_path << '\n';
-                }
-                auto &nodes_copy = nodes_by_id; // capture by value for async task
+            for (const auto & item : compiles) {
+                auto &nodes_copy = nodes_by_id;
                 futures.emplace_back(std::async(std::launch::async, [item, nodes_copy] {
                     return run_with_affinity(item.cmd, nodes_copy, item.node_id, cout, item.stdout_path,
                                              item.stderr_path);
                 }));
             }
-            // Wait and check
+
             for (size_t i = 0; i < futures.size(); ++i) {
                 if (int rc = futures[i].get(); rc != 0) {
-                    log << "[Make] Compile command failed with code " << rc << '\n';
+                    print_status(log, "Compiling: " + compiles[i].desc, "!!", true);
                     return false;
                 }
-                ++done_tasks;
-                print_progress(done_tasks, total_tasks, log, compiles[i].desc, compiles[i].cmd, compiles[i].stdout_path,
-                               compiles[i].stderr_path, compiles[i].id);
+                print_status(log, "Compiling: " + compiles[i].desc, "ok");
             }
         }
 
-        // Run the remaining tasks sequentially (e.g., linking), with affinity for the first target node (if any)
-        for (size_t i = 0; i < others.size(); ++i) {
-            const auto &[cmd, desc, stdout_path, stderr_path, id, node_id] = others[i];
-            if (int cpu = infer_logical_cpu(nodes_by_id, node_id); cpu >= 0) {
-                log << "\n[Make][S][" << (i + 1) << "/" << others.size() << "] pin cpu=" << cpu << " nid=" << node_id <<
-                        " $ " << cmd << "\n  -> logs: " << stdout_path << ", " << stderr_path << '\n';
-            } else {
-                log << "\n[Make][S][" << (i + 1) << "/" << others.size() << "] $ " << cmd << "-> logs: " <<
-                        stdout_path << ", " << stderr_path << '\n';
-            }
+        // Run the remaining tasks sequentially
+        for (const auto& [cmd, desc, stdout_path, stderr_path, id, node_id] : others) {
             if (int rc = run_with_affinity(cmd, nodes_by_id, node_id, log, stdout_path, stderr_path); rc != 0) {
-                log << "[Make] Command failed with code " << rc << ": " << cmd << '\n';
+                print_status(log, "Processing: " + desc, "!!", true);
                 return false;
             }
-            ++done_tasks;
-            print_progress(done_tasks, total_tasks, log, desc, cmd, stdout_path, stderr_path,
-                           id);
+            print_status(log, "Processing: " + desc, "ok");
         }
-
-        log << "\n[Make] All tasks completed successfully." << '\n';
+        print_status(log, "Build completed successfully", "ok");
         return true;
     }
-} // namespace Dualys
+} // namespace dualys

@@ -2,7 +2,6 @@
 
 #include <iosfwd>
 #include <string>
-#include <vector>
 
 namespace dualys {
     // A very small helper to "build hamon by hamon" using a .hc script.
@@ -18,10 +17,6 @@ namespace dualys {
         // Returns true on success (all commands returned exit code 0), false otherwise.
         static bool build_from_hc(const std::string &hc_path, std::ostream &log);
 
-        // Convenience overload writing logs to std::cout
         static bool build_from_hc(const std::string &hc_path);
-
-    private:
-        static std::vector<std::string> extract_tasks(const std::string &hc_path, std::ostream &log);
     };
 } // namespace Dualys

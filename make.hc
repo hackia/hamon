@@ -8,10 +8,10 @@
 @node 3 @role worker @cpu numa=0 core=3
 
 @job CompileHamon
-  @phase CompileCPP by=[0] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -c Hamon.cpp -o Hamon.o"
-  @phase CompileCPP by=[1] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -c HamonCube.cpp -o HamonCube.o"
-  @phase CompileCPP by=[2] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -c HamonNode.cpp -o HamonNode.o"
-  @phase CompileCPP by=[3] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -c Make.cpp -o Make.o"
-  @phase CompileCPP by=[3] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -c main.cpp -o main.o"
-  @phase LinkExecutable to=[0] task="g++ *.o -o hamon"
+  @phase Hamon by=[0] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -Iinclude -c src/Hamon.cpp -o Hamon.o"
+  @phase HamonCube by=[1] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -Iinclude -c src/HamonCube.cpp -o HamonCube.o"
+  @phase HamonNode by=[2] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -Iinclude -c src/HamonNode.cpp -o HamonNode.o"
+  @phase Make by=[3] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -Iinclude -c src/Make.cpp -o Make.o"
+  @phase Main by=[0] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -Iinclude -c apps/hamon/main.cpp -o main.o"
+  @phase LinkExecutable to=[0] task="g++ Hamon.o HamonCube.o HamonNode.o Make.o main.o -o hamon"
 @end
