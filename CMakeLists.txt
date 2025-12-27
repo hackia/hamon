@@ -13,15 +13,19 @@ set(GCC_WARNING_FLAGS
         -Werror
 )
 
+find_package(Gettext REQUIRED)
+find_path(INTL_INCLUDE_DIR libintl.h PATHS /usr/local/include /usr/include)
+find_library(INTL_LIBRARY NAMES intl libintl PATHS /usr/local/lib /usr/lib)
+
 add_library(cube STATIC src/HamonCube.cpp include/HamonCube.hpp src/HamonNode.cpp include/HamonNode.hpp src/Hamon.cpp include/Hamon.hpp src/Make.cpp include/Make.hpp)
 target_compile_options(cube PRIVATE ${GCC_WARNING_FLAGS})
 
 add_executable(hamon apps/hamon/main.cpp)
 target_compile_options(hamon PRIVATE ${GCC_WARNING_FLAGS})
 target_link_libraries(hamon cube)
-
+target_include_directories(hamon PRIVATE ${INTL_INCLUDE_DIR})
 install(TARGETS hamon DESTINATION bin)
-install(FILES include/HamonCube.hpp DESTINATION include)
+install(FILES include/HamonCube.hpp include/Make.hpp include/HamonNode.hpp include/Hamon.hpp DESTINATION include)
 install(TARGETS cube DESTINATION lib)
 
 enable_testing()
