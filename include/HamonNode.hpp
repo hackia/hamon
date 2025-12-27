@@ -1,10 +1,13 @@
 #pragma once
-
+#include <libintl.h>
 #include "HamonCube.hpp"
 #include <map>
 #include <string>
 #include <vector>
-
+#ifndef I18N_GETTEXT_DEFINED
+#define _(String) gettext(String)
+#define I18N_GETTEXT_DEFINED
+#endif
 namespace dualys {
     using WordCountMap = std::map<std::string, int>;
 

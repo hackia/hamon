@@ -1,5 +1,5 @@
 #pragma once
-
+#include <libintl.h>
 #include <filesystem>
 #include <iostream>
 #include <optional>

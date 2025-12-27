@@ -13,15 +13,13 @@ add_library(cube STATIC
         src/Hamon.cpp
         src/Make.cpp
 )
+
 target_link_libraries(cube PUBLIC Intl::Intl)
 target_compile_options(cube PRIVATE ${GCC_WARNING_FLAGS})
-target_include_directories(cube PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
-)
+
 add_executable(hamon apps/hamon/main.cpp)
-target_compile_options(hamon PRIVATE ${GCC_WARNING_FLAGS})
 target_link_libraries(hamon PRIVATE cube)
+target_compile_options(hamon PRIVATE ${GCC_WARNING_FLAGS})
 
 install(TARGETS hamon DESTINATION bin)
 install(FILES include/HamonCube.hpp include/Make.hpp include/HamonNode.hpp include/Hamon.hpp DESTINATION include)

@@ -1,8 +1,12 @@
 #pragma once
-
+#include <libintl.h>
 #include <iosfwd>
 #include <string>
 
+#ifndef I18N_GETTEXT_DEFINED
+#define _(String) gettext(String)
+#define I18N_GETTEXT_DEFINED
+#endif
 namespace dualys {
     // A very small helper to "build hamon by hamon" using a .hc script.
     // It scans @phase lines and executes the task="..." commands in order.
@@ -15,8 +19,8 @@ namespace dualys {
     public:
         // Parse the given .hc file and execute its task commands sequentially.
         // Returns true on success (all commands returned exit code 0), false otherwise.
-        static bool build_from_hc(const std::string &hc_path, std::ostream &log);
+        static bool build_from_hc(const std::string &hc_path, std::ostream &log = std::cout);
 
         static bool build_from_hc(const std::string &hc_path);
     };
-} // namespace Dualys
+} // namespace dualys
