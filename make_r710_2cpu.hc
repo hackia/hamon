@@ -26,7 +26,7 @@
 @node 14 @role worker      @cpu numa=1 core=6
 @node 15 @role worker      @cpu numa=1 core=7
 
-@let CXXFLAGS = "-std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -O2"
+@let CXXFLAGS = "-std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -O2 -I/usr/local/include"
 
 @job CompileHamon
   @phase Hamon by=[0] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -Iinclude -c src/Hamon.cpp -o Hamon.o"
@@ -34,5 +34,5 @@
   @phase HamonNode by=[2] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -Iinclude -c src/HamonNode.cpp -o HamonNode.o"
   @phase Make by=[3] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -Iinclude -c src/Make.cpp -o Make.o"
   @phase Main by=[0] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -Iinclude -c apps/hamon/main.cpp -o main.o"
-  @phase LinkExecutable to=[0] task="g++ Hamon.o HamonCube.o HamonNode.o Make.o main.o -o hamon -pthread"
+  @phase LinkExecutable to=[0] task="g++ Hamon.o HamonCube.o HamonNode.o Make.o main.o -o hamon -L/usr/local/lib -lintl -pthread"
 @end
