@@ -19,8 +19,6 @@ namespace dualys {
     public:
         // Parse the given .hc file and execute its task commands sequentially.
         // Returns true on success (all commands returned exit code 0), false otherwise.
-        static bool build_from_hc(const std::string &hc_path, std::ostream &log = std::cout);
-
-        static bool build_from_hc(const std::string &hc_path);
+        static bool build_from_hc(const std::string &hc_path, std::ostream &log);
     };
 } // namespace dualys

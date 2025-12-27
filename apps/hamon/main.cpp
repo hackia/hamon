@@ -141,7 +141,7 @@ int main(const int argc, char **argv) {
         // Otherwise assume it's an .hc path
         const std::string &hc_path = arg1;
         std::cout << "[hamon] Running tasks from: " << hc_path << std::endl;
-        const bool ok = Make::build_from_hc(hc_path);
+        const bool ok = Make::build_from_hc(hc_path, std::cout);
         return ok ? 0 : 1;
     }
 
