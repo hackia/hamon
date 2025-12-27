@@ -26,13 +26,13 @@
 @node 14 @role worker      @cpu numa=1 core=6
 @node 15 @role worker      @cpu numa=1 core=7
 
-@let CXXFLAGS = "-std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -O2 -I/usr/local/include"
+@let CXXFLAGS = "-std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -O2 -I /usr/local/include  -L /usr/local/lib -lintl -pthread"
 
 @job CompileHamon
-  @phase Hamon by=[0] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror  -I/usr/local/include -c src/Hamon.cpp -o Hamon.o"
-  @phase HamonCube by=[1] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror  -I/usr/local/include -c src/HamonCube.cpp -o HamonCube.o"
-  @phase HamonNode by=[2] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror  -I/usr/local/include -c src/HamonNode.cpp -o HamonNode.o"
-  @phase Make by=[3] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -I/usr/local/include -c src/Make.cpp -o Make.o"
-  @phase Main by=[0] task="g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -I/usr/local/include -c apps/hamon/main.cpp -o main.o"
-  @phase LinkExecutable to=[0] task="g++ Hamon.o HamonCube.o HamonNode.o Make.o main.o -o hamon -L/usr/local/lib -lintl -pthread"
+  @phase Hamon by=[0] task="g++ ${CXXFLAGS} -c src/Hamon.cpp -o Hamon.o"
+  @phase HamonCube by=[1] task="g++ ${CXXFLAGS}  -c src/HamonCube.cpp -o HamonCube.o"
+  @phase HamonNode by=[2] task="g++ ${CXXFLAGS}  -c src/HamonNode.cpp -o HamonNode.o"
+  @phase Make by=[3] task="g++ ${CXXFLAGS} -c src/Make.cpp -o Make.o"
+  @phase Main by=[0] task="g++ ${CXXFLAGS} -c apps/hamon/main.cpp -o main.o"
+  @phase LinkExecutable to=[0] task="g++ Hamon.o HamonCube.o HamonNode.o Make.o main.o -o hamon"
 @end
