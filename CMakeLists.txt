@@ -3,6 +3,9 @@ project(hamon)
 
 set(CMAKE_CXX_STANDARD 26)
 find_package(Intl REQUIRED)
+find_package(Threads REQUIRED)
+
+
 set(GCC_WARNING_FLAGS
         -Wall -Wextra -Wpedantic -Wshadow -Wformat=2
         -Wconversion -Wsign-conversion -Werror
@@ -13,8 +16,7 @@ add_library(cube STATIC
         src/Hamon.cpp
         src/Make.cpp
 )
-
-target_link_libraries(cube PUBLIC Intl::Intl)
+target_link_libraries(cube PUBLIC Intl::Intl Threads::Threads)
 target_compile_options(cube PRIVATE ${GCC_WARNING_FLAGS})
 
 add_executable(hamon apps/hamon/main.cpp)
@@ -24,7 +26,6 @@ target_compile_options(hamon PRIVATE ${GCC_WARNING_FLAGS})
 install(TARGETS hamon DESTINATION bin)
 install(FILES include/HamonCube.hpp include/Make.hpp include/HamonNode.hpp include/Hamon.hpp DESTINATION include)
 install(TARGETS cube DESTINATION lib)
-
 enable_testing()
 
 include(FetchContent)
