@@ -9,7 +9,12 @@
 #include <vector>
 #include <regex>
 
-namespace Dualys {
+#ifndef I18N_GETTEXT_DEFINED
+#define _(String) gettext(String)
+#define I18N_GETTEXT_DEFINED
+#endif
+
+namespace dualys {
     struct NodeCfg {
         int id = -1;
         std::string role; // "worker" | "coordinator" | "custom:..."
@@ -25,7 +30,6 @@ namespace Dualys {
         std::string task; // La commande à exécuter
         std::string description; // Description optionnelle à afficher dans la progress bar
         std::vector<int> target_nodes; // IDs des nœuds concernés
-        // Optionnel: could store selector kind if needed later
     };
 
     struct Job {

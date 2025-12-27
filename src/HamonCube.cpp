@@ -1,23 +1,17 @@
-#include "HamonCube.hpp"
+#include "../include/HamonCube.hpp"
 #include <stdexcept>
 #include <iostream>
 #include <vector>
 #include <unistd.h>
-#include <sys/wait.h>
 #include <thread>
 #include <cmath>
-#include <sys/socket.h>
-#include <netinet/in.h>
-
-using namespace Dualys;
+using namespace dualys;
 
 void HamonCube::initializeTopology() {
-    // Utilise size_t pour les boucles sur les indices
     for (size_t i = 0; i < static_cast<size_t>(node_count); ++i) {
-        nodes[i].id = static_cast<int>(i); // On stocke l'id en 'int', donc on caste explicitement
+        nodes[i].id = static_cast<int>(i);
         for (int d = 0; d < dimension; ++d) {
-            // Le résultat de l'opération binaire est converti en int avant le push_back
-            nodes[i].neighbors.push_back(static_cast<int>(i ^ (1 << d)));
+            nodes[i].neighbors.push_back(static_cast<int>(i ^ 1 << d));
         }
     }
 }
@@ -32,14 +26,14 @@ const std::vector<Node> &HamonCube::getNodes() const {
 
 const Node &HamonCube::getNode(const size_t id) const {
     if (id >= nodes.size()) {
-        throw std::out_of_range("Node ID is out of range.");
+        throw std::out_of_range(_("Node ID is out of range."));
     }
     return nodes[id];
 }
 
 HamonCube::HamonCube(const int num_nodes) : node_count(num_nodes) {
     if (num_nodes <= 0 || (num_nodes & (num_nodes - 1)) != 0) {
-        throw std::invalid_argument("Number of nodes must be a power of 2.");
+        throw std::invalid_argument(_("Number of nodes must be a power of 2."));
     }
     this->dimension = static_cast<int>(log2(num_nodes));
     nodes.resize(static_cast<size_t>(node_count));

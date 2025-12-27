@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace Dualys {
+namespace dualys {
     using WordCountMap = std::map<std::string, int>;
 
     class HamonNode {

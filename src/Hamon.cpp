@@ -1,4 +1,4 @@
-#include "Hamon.hpp"
+#include "../include/Hamon.hpp"
 #include <iostream>
 #include <vector>
 #include <algorithm>
@@ -7,7 +7,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <filesystem>
-using namespace Dualys;
+
+using namespace dualys;
 namespace fs = std::filesystem;
 
 // ------------ Helpers ------------
@@ -20,7 +21,9 @@ std::string HamonParser::trim(const std::string &x) {
     while (rend != x.rend() && std::isspace(static_cast<unsigned char>(*rend))) {
         ++rend;
     }
-    return std::string(start, rend.base());
+    return {
+        start, rend.base()
+    };
 }
 
 bool HamonParser::starts_with(const std::string &s, const std::string &p) {
@@ -34,15 +37,14 @@ std::vector<std::string> HamonParser::split_ws(const std::string &line) {
     while (iss >> tok) tokens.push_back(std::move(tok));
     return tokens;
 }
-
 std::vector<int> HamonParser::parse_list_ids(const std::string &src) {
     std::vector<int> result;
     const auto t = trim(src);
     if (t.empty() || t.front() != '[' || t.back() != ']') {
-        throw new std::runtime_error(std::string("Invalid list format: ") + src);
+        throw new std::runtime_error(_("Invalid list format"));
     }
     const auto content = t.substr(1, t.size() - 2);
-    if (content.empty()) { return result; }
+    if (content.empty()) { return {}; }
     std::stringstream ss(content);
     std::string item;
     while (std::getline(ss, item, ',')) {
@@ -53,36 +55,36 @@ std::vector<int> HamonParser::parse_list_ids(const std::string &src) {
         try {
             result.push_back(std::stoi(item));
         } catch (std::runtime_error &) {
-            throw new std::runtime_error(std::string("Invalid number in list: ") + item);
+            throw new std::runtime_error(_("Invalid number in list"));
         }
     }
     return result;
 }
 
 std::vector<int> HamonParser::parse_target_selector(const std::string &selector) const {
-    std::string t = trim(selector);
+    const std::string t = trim(selector);
     if (t.empty() || t.front() != '[' || t.back() != ']') {
-        bad(std::string("Invalid selector format: ") + selector);
+        bad(std::string(_("Invalid selector format: "))  + selector);
     }
-    std::string content = trim(t.substr(1, t.size() - 2));
+    const std::string content = trim(t.substr(1, t.size() - 2));
     std::vector<int> out;
     if (content == "*" || content == "all") {
-        if (nodes < 0) bad("@phase used before @use <N>");
+        if (nodes < 0) bad(_("@phase used before @use <N>"));
         out.reserve(static_cast<size_t>(nodes));
         for (int i = 0; i < nodes; ++i) out.push_back(i);
         return out;
     }
     if (content == "workers") {
-        if (nodes < 0) bad("@phase used before @use <N>");
+        if (nodes < 0) bad(_("@phase used before @use <N>"));
         for (int i = 0; i < nodes; ++i) if (i != 0) out.push_back(i);
         return out;
     }
     // explicit list
     out = parse_list_ids(selector);
     // validate
-    for (int v : out) {
+    for (const int v: out) {
         if (v < 0 || (nodes >= 0 && v >= nodes)) {
-            bad(std::string("Target node id out of range: ") + std::to_string(v));
+            bad(std::string(_("Target node id out of range: ")) + std::to_string(v));
         }
     }
     return out;
@@ -91,11 +93,11 @@ std::vector<int> HamonParser::parse_target_selector(const std::string &selector)
 void HamonParser::parse_host_port(const std::string &s, std::string &host, int &port) {
     const auto pos = s.find(':');
     if (pos == std::string::npos) {
-        throw new std::runtime_error(std::string("Invalid host:port format: ") + s);
+        throw new std::runtime_error(std::string(_("Invalid host:port format: ")) + s);
     }
     host = trim(s.substr(0, pos));
     try { port = std::stoi(trim(s.substr(pos + 1))); } catch (...) {
-        throw new std::runtime_error(std::string("Invalid port number in: ") + s);
+        throw new std::runtime_error(std::string(_("Invalid port number in: ")) + s);
     }
 }
 
@@ -175,8 +177,7 @@ void HamonParser::parse_file(const std::string &path) {
     while (std::getline(in, line)) {
         ++currentLine;
         std::string s = trim(line);
-        auto cpos = s.find("//");
-        if (cpos != std::string::npos) s = trim(s.substr(0, cpos));
+        if (auto cpos = s.find("//"); cpos != std::string::npos) s = trim(s.substr(0, cpos));
         if (s.empty()) continue;
         parse_line(s);
     }
@@ -191,7 +192,7 @@ void HamonParser::parse_line(const std::string &line) {
         s = trim(s.substr(0, cpos));
     }
     if (s.empty()) return;
-    cpos = s.find("#");
+    cpos = s.find('#');
     if (cpos != std::string::npos) {
         s = trim(s.substr(0, cpos));
     }
@@ -203,8 +204,8 @@ void HamonParser::parse_line(const std::string &line) {
         auto strip_quotes = [](std::string &x) {
             x = trim(x);
             if (x.size() >= 2) {
-                const char a = x.front(), b = x.back();
-                if ((a == '"' && b == '"') || (a == '\'' && b == '\'')) {
+                const char a = x.front();
+                if (const char b = x.back(); (a == '"' && b == '"') || (a == '\'' && b == '\'')) {
                     x = x.substr(1, x.size() - 2);
                 }
             }
@@ -310,7 +311,8 @@ void HamonParser::parse_line(const std::string &line) {
         if (currentJobIndex == -1) bad("@input used outside of @job");
         std::string rest = trim(s.substr(std::string("@input").size()));
         // strip optional quotes
-        if (rest.size() >= 2 && ((rest.front() == '"' && rest.back() == '"') || (rest.front() == '\'' && rest.back() == '\''))) {
+        if (rest.size() >= 2 && ((rest.front() == '"' && rest.back() == '"') || (
+                                     rest.front() == '\'' && rest.back() == '\''))) {
             rest = rest.substr(1, rest.size() - 2);
         }
         jobs[static_cast<size_t>(currentJobIndex)].input = expand_vars(rest);
@@ -329,7 +331,6 @@ void HamonParser::parse_line(const std::string &line) {
         name = rest.substr(i, j - i);
         Phase ph;
         ph.name = name;
-        // extract task="..."
         {
             static const std::regex taskRe(R"_HC(\btask\s*=\s*\"([^\"]*)\")_HC");
             std::smatch m;
@@ -337,27 +338,24 @@ void HamonParser::parse_line(const std::string &line) {
                 if (m.size() >= 2) ph.task = m[1].str();
             }
         }
-        // extract optional desc="..."
         {
             static const std::regex descRe(R"_HC(\bdesc\s*=\s*\"([^\"]*)\")_HC");
-            std::smatch m;
-            if (std::regex_search(rest, m, descRe)) {
-                if (m.size() >= 2) ph.description = m[1].str();
+            if (std::smatch match; std::regex_search(rest, match, descRe)) {
+                if (match.size() >= 2) ph.description = match[1].str();
             }
         }
         if (ph.task.empty()) bad("@phase missing task=\"...\"");
-        // extract by=[...] or to=[...]
         {
-            auto find_selector = [&](const char *key)->std::string {
+            auto find_selector = [&](const char *key)-> std::string {
                 const std::string k = std::string(key) + std::string("=");
                 size_t pos = rest.find(k);
-                if (pos == std::string::npos) return std::string();
+                if (pos == std::string::npos) return {};
                 pos += k.size();
                 // skip spaces
                 while (pos < rest.size() && std::isspace(static_cast<unsigned char>(rest[pos]))) ++pos;
-                if (pos >= rest.size() || rest[pos] != '[') return std::string();
+                if (pos >= rest.size() || rest[pos] != '[') return {};
                 size_t end = rest.find(']', pos);
-                if (end == std::string::npos) bad(std::string("Missing closing ']' for ") + key);
+                if (end == std::string::npos) bad(std::string(_("Missing closing ']' for ")) + key);
                 return rest.substr(pos, end - pos + 1);
             };
             std::string sel = find_selector("by");
@@ -431,18 +429,15 @@ void HamonParser::parse_line(const std::string &line) {
                 bad(std::string("Unexpected token after @node id: ") + rest.substr(k));
             }
             size_t m = k + 1;
-            // find next directive start '@' that is separated by whitespace
             for (; m < rest.size(); ++m) {
                 if (rest[m] == '@' && std::isspace(static_cast<unsigned char>(rest[m - 1]))) break;
             }
-            const std::string sub = trim(rest.substr(k, m - k));
-            if (!sub.empty()) parse_line(sub);
+            if (const std::string sub = trim(rest.substr(k, m - k)); !sub.empty()) parse_line(sub);
             rest = trim(rest.substr(m));
         }
         return;
     }
 
-    // --- Attributs de node (nécessitent un @node courant) ---
     if (starts_with(s, "@role")) {
         if (currentNodeId < 0) bad("@role used outside of @node");
         const auto rest = trim(s.substr(std::string("@role").size()));
@@ -457,8 +452,7 @@ void HamonParser::parse_line(const std::string &line) {
         int numa = ensure_node(currentNodeId).numa;
         int core = ensure_node(currentNodeId).core;
         {
-            const auto toks = split_ws(s.substr(std::string("@cpu").size()));
-            for (const auto &t : toks) {
+            for (const auto toks = split_ws(s.substr(std::string("@cpu").size())); const auto &t: toks) {
                 const auto eq = t.find('=');
                 if (eq == std::string::npos) continue;
                 auto k = trim(t.substr(0, eq));
@@ -560,15 +554,11 @@ void HamonParser::finalize() {
             }
         }
     }
-    // À la fin de finalize(), après avoir rempli les voisins par défaut si besoin :
     for (int id = 0; id < nodes; ++id) {
         auto &n = *config[static_cast<std::size_t>(id)];
-        // supprimer doublons
-        std::sort(n.neighbors.begin(), n.neighbors.end());
-        n.neighbors.erase(std::unique(n.neighbors.begin(), n.neighbors.end()), n.neighbors.end());
-        // pas d’auto-voisin
-        n.neighbors.erase(std::remove(n.neighbors.begin(), n.neighbors.end(), id), n.neighbors.end());
-        // vérifier bornes
+        std::ranges::sort(n.neighbors);
+        n.neighbors.erase(std::ranges::unique(n.neighbors).begin(), n.neighbors.end());
+        std::erase(n.neighbors, id);
         for (const int v: n.neighbors) {
             if (v < 0 || v >= nodes) {
                 bad("Neighbor out of range for node " + std::to_string(id) + ": " + std::to_string(v));
@@ -600,11 +590,11 @@ void HamonParser::print_plan(std::ostream &os) const {
         if (opt.has_value()) {
             const auto &[id, role, numa, core, host, port, neighbors] = *opt;
             os << "  • Node " << id
-               << " | role=" << (role.empty() ? "<unset>" : role)
-               << " | core=" << core
-               << " | numa=" << numa
-               << " | endpoint=" << host << ":" << port
-               << " | neighbors=[";
+                    << " | role=" << (role.empty() ? "<unset>" : role)
+                    << " | core=" << core
+                    << " | numa=" << numa
+                    << " | endpoint=" << host << ":" << port
+                    << " | neighbors=[";
             for (size_t i = 0; i < neighbors.size(); ++i) {
                 if (i) os << ",";
                 os << neighbors[i];
@@ -659,8 +649,7 @@ bool HamonParser::eval_require_expr(const std::string &raw) const {
     {
         bool inq = false;
         std::string cur;
-        for (size_t i = 0; i < s.size(); ++i) {
-            const char c = s[i];
+        for (char c: s) {
             if (c == '"') {
                 inq = !inq;
                 continue;
@@ -689,8 +678,7 @@ bool HamonParser::eval_require_expr(const std::string &raw) const {
     }
     if (tok.size() >= 3) {
         const std::string L = resolve(tok[0]);
-        const std::string OP = tok[1];
-        // re-colle le RHS (au cas où il y avait des espaces entre guillemets)
+        const std::string &OP = tok[1];
         std::string R;
         for (size_t i = 2; i < tok.size(); ++i) {
             if (i > 2) R.push_back(' ');

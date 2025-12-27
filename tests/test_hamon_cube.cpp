@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
-#include "../HamonCube.hpp"
-using namespace Dualys;
+#include "../include/HamonCube.hpp"
+using namespace dualys;
 
 TEST(HamonCubeTest, Handles8NodeCube)
 {
@@ -21,7 +21,7 @@ TEST(HamonCubeTest, CorrectNeighborsForNode5)
 
 TEST(HamonCubeTest, ThrowsOnInvalidNodeCount)
 {
-    EXPECT_THROW(Dualys::HamonCube(7), std::invalid_argument);
-    EXPECT_THROW(Dualys::HamonCube(0), std::invalid_argument);
-    EXPECT_THROW(Dualys::HamonCube(-8), std::invalid_argument);
+    EXPECT_THROW(dualys::HamonCube(7), std::invalid_argument);
+    EXPECT_THROW(dualys::HamonCube(0), std::invalid_argument);
+    EXPECT_THROW(dualys::HamonCube(-8), std::invalid_argument);
 }

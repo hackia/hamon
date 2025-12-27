@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace Dualys {
+namespace dualys {
     // A very small helper to "build hamon by hamon" using a .hc script.
     // It scans @phase lines and executes the task="..." commands in order.
     // Notes:

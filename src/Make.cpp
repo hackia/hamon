@@ -1,5 +1,5 @@
-#include "Make.hpp"
-#include "Hamon.hpp"
+#include "../include/Hamon.hpp"
+#include "../include/Make.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -18,7 +18,7 @@
 #include <csignal>
 #include <cmath>
 
-namespace Dualys {
+namespace dualys {
     using namespace std;
 
     struct RunItem {
@@ -43,7 +43,7 @@ namespace Dualys {
         double ratio = static_cast<double>(done) / static_cast<double>(total);
         if (ratio < 0) ratio = 0;
         if (ratio > 1) ratio = 1;
-        const size_t filled = static_cast<size_t>(ratio * width + 0.5);
+        const auto filled = static_cast<size_t>(ratio * width + 0.5);
 
         // Build bar
         std::ostringstream bar;
@@ -51,8 +51,8 @@ namespace Dualys {
         const int percent = static_cast<int>(ratio * 100.0 + 0.5);
 
         // Spinner frame (simple ASCII to avoid locale issues)
-        static const char frames[] = {'|', '/', '-', '\\'};
-        const char spinner = frames[(done % (sizeof(frames) / sizeof(frames[0])))];
+        static constexpr char frames[] = {'|', '/', '-', '\\'};
+        const char spinner = frames[(done % std::size(frames))];
 
         // Trim long desc/cmd to keep the line readable
         auto trim_to = [](std::string s, const size_t n) {
@@ -78,7 +78,7 @@ namespace Dualys {
         log << std::flush;
     }
 
-    static int infer_logical_cpu(const std::unordered_map<int, NodeCfg> &nodes_by_id, int node_id) {
+    static int infer_logical_cpu(const std::unordered_map<int, NodeCfg> &nodes_by_id, const int node_id) {
         const auto it = nodes_by_id.find(node_id);
         if (it == nodes_by_id.end()) return -1;
         const auto &n = it->second;
@@ -88,7 +88,7 @@ namespace Dualys {
         if (hw == 0) hw = 1;
         int max_numa = -1;
         for (const auto &snd: nodes_by_id | views::values) if (snd.numa >= 0) max_numa = std::max(max_numa, snd.numa);
-        const int numa_count = max_numa >= 0 ? (max_numa + 1) : 1;
+        const int numa_count = max_numa >= 0 ? max_numa + 1 : 1;
         unsigned cores_per_numa = hw / (numa_count == 0 ? 1 : static_cast<unsigned>(numa_count));
         if (cores_per_numa == 0) cores_per_numa = 1;
         const int numa = std::max(n.numa, 0);
@@ -99,7 +99,7 @@ namespace Dualys {
     }
 
     static int run_with_affinity(const std::string &cmd, const std::unordered_map<int, NodeCfg> &nodes_by_id,
-                                 int node_id, std::ostream &log, const std::string &out_path,
+                                 const int node_id, std::ostream &log, const std::string &out_path,
                                  const std::string &err_path) {
         const int cpu = infer_logical_cpu(nodes_by_id, node_id);
         const pid_t pid = fork();
@@ -120,18 +120,17 @@ namespace Dualys {
             }
             // Redirect stdout/stderr to files
             if (!out_path.empty()) {
-                if (const int fd = ::open(out_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644); fd >= 0) {
-                    ::dup2(fd, STDOUT_FILENO);
-                    ::close(fd);
+                if (const int fd = open(out_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644); fd >= 0) {
+                    dup2(fd, STDOUT_FILENO);
+                    close(fd);
                 }
             }
             if (!err_path.empty()) {
-                if (const int fd = ::open(err_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644); fd >= 0) {
-                    ::dup2(fd, STDERR_FILENO);
-                    ::close(fd);
+                if (const int fd = open(err_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644); fd >= 0) {
+                    dup2(fd, STDERR_FILENO);
+                    close(fd);
                 }
             }
-            // Exec via /bin/sh -c to avoid manual argv parsing
             execl("/bin/sh", "sh", "-c", cmd.c_str(), static_cast<char *>(nullptr));
             _exit(127);
         }
@@ -225,7 +224,7 @@ namespace Dualys {
             vector<future<int> > futures;
             futures.reserve(compiles.size());
             for (size_t i = 0; i < compiles.size(); ++i) {
-                const auto item = compiles[i];
+                const auto &item = compiles[i];
                 if (int cpu = infer_logical_cpu(nodes_by_id, item.node_id); cpu >= 0) {
                     log << "\r[Make][C][" << (i + 1) << "/" << compiles.size() << "] pin cpu=" << cpu << " nid="
                             << item.node_id << " $ " << item.cmd << "  -> logs: " << item.stdout_path << ", " <<
@@ -234,8 +233,8 @@ namespace Dualys {
                     log << "\r[Make][C][" << (i + 1) << "/" << compiles.size() << "] $ " << item.cmd << "  -> logs: "
                             << item.stdout_path << ", " << item.stderr_path << '\n';
                 }
-                auto nodes_copy = nodes_by_id; // capture by value for async task
-                futures.emplace_back(std::async(std::launch::async, [item, nodes_copy]() {
+                auto &nodes_copy = nodes_by_id; // capture by value for async task
+                futures.emplace_back(std::async(std::launch::async, [item, nodes_copy] {
                     return run_with_affinity(item.cmd, nodes_copy, item.node_id, cout, item.stdout_path,
                                              item.stderr_path);
                 }));

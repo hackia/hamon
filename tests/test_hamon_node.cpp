@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
-#include "../HamonNode.hpp"
+#include "../include/HamonNode.hpp"
 
-using namespace Dualys;
+using namespace dualys;
 
 TEST(HamonNodeLogicTest, Serialization)
 {
@@ -23,7 +23,7 @@ TEST(HamonNodeLogicTest, Serialization)
 TEST(HamonNodeLogicTest, DeserializationAndMerge)
 {
     // ARRANGE
-    Dualys::WordCountMap counts;
+    dualys::WordCountMap counts;
     counts["existing"] = 5;
     counts["another"] = 3;
     const std::string data_to_merge = "new:10,existing:2,";

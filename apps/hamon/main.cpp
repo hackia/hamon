@@ -1,7 +1,7 @@
-#include "HamonCube.hpp"
-#include "HamonNode.hpp"
-#include "Hamon.hpp"
-#include "Make.hpp"
+#include "../../include/HamonCube.hpp"
+#include "../../include/HamonNode.hpp"
+#include "../../include/Hamon.hpp"
+#include "../../include/Make.hpp"
 #include <iostream>
 #include <vector>
 #include <unistd.h>
@@ -10,16 +10,10 @@
 #include <cmath>
 #include <fstream>
 #include <filesystem>
-#include <limits>
 #include <clocale>
 #include <libintl.h>
 
-using namespace Dualys;
-
-#ifndef I18N_GETTEXT_DEFINED
-#define _(String) gettext(String)
-#define I18N_GETTEXT_DEFINED
-#endif
+using namespace dualys;
 
 int largest_power_of_two(const unsigned int n) {
     if (n == 0)
@@ -41,15 +35,11 @@ std::vector<NodeConfig> generate_configs(const int node_count) {
     return configs;
 }
 
-
-
 void run_node_process(const int node_id, const int node_count, const std::vector<NodeConfig> &configs) {
     const HamonCube cube(node_count);
     HamonNode node(cube.getNode(static_cast<std::size_t>(node_id)), cube, configs);
     node.run();
 }
-
-// --- Orchestrateur ---
 
 static std::string prompt(const std::string &q, const std::string &def = {}) {
     std::cout << q;
@@ -61,7 +51,7 @@ static std::string prompt(const std::string &q, const std::string &def = {}) {
     return s;
 }
 
-static bool write_text_file(const std::filesystem::path &p, const std::string &content, bool overwrite) {
+static bool write_text_file(const std::filesystem::path &p, const std::string &content, const bool overwrite) {
     if (!overwrite && std::filesystem::exists(p)) {
         std::cerr << "File already exists: " << p << " (won't overwrite)\n";
         return false;
@@ -89,9 +79,11 @@ int main(const int argc, char **argv) {
             if (fname.empty()) fname = def_name;
             if (fname.rfind(".hc") == std::string::npos) fname += ".hc";
 
-            std::string nodes_s = prompt(_("Number of nodes (@use), power of 2"), std::to_string(def_nodes > 0 ? def_nodes : 1));
-            int nodes = def_nodes;
-            try { nodes = std::stoi(nodes_s); } catch (...) {}
+            std::string nodes_s = prompt(
+                _("Number of nodes (@use), power of 2"), std::to_string(def_nodes > 0 ? def_nodes : 1));
+            int nodes = 0;
+            try { nodes = std::stoi(nodes_s); } catch (...) {
+            }
             if (nodes <= 0) nodes = def_nodes > 0 ? def_nodes : 1;
 
             std::string topology = prompt(_("Topology (@topology)"), "hypercube");
@@ -100,12 +92,15 @@ int main(const int argc, char **argv) {
             std::string host = prompt(_("IP/host for @autoprefix"), "127.0.0.1");
             if (host.empty()) host = "127.0.0.1";
             std::string base_port_s = prompt(_("Base port for @autoprefix"), "9000");
-            int base_port = 9000; try { base_port = std::stoi(base_port_s); } catch (...) {}
+            int base_port = 0;
+            try { base_port = std::stoi(base_port_s); } catch (...) {
+            }
             if (base_port <= 0) base_port = 9000;
 
             std::string jobname = prompt(_("Job name (@job)"), "BuildHamon");
-            std::string want_example = prompt(_("Add example phases to build this project? (y/n)"), "y");
-            bool with_examples = !want_example.empty() && (want_example[0] == 'y' || want_example[0] == 'Y' || want_example == "1");
+            const std::string want_example = prompt(_("Add example phases to build this project? (y/n)"), "y");
+            const bool with_examples = !want_example.empty() && (
+                                           want_example[0] == 'y' || want_example[0] == 'Y' || want_example == "1");
 
             // Generate content
             std::ostringstream hc;
@@ -116,11 +111,13 @@ int main(const int argc, char **argv) {
             // Nodes
             hc << _("# Roles\n");
             for (int i = 0; i < nodes; ++i) {
-                if (i == 0) hc << "@node " << i << " @role coordinator\n"; else hc << "@node " << i << " @role worker\n";
+                if (i == 0) hc << "@node " << i << " @role coordinator\n";
+                else hc << "@node " << i << " @role worker\n";
             }
             hc << "\n@job " << (jobname.empty() ? std::string("Job1") : jobname) << "\n";
             if (with_examples) {
-                hc << "  @phase Compile by=[0] task=\"g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -c main.cpp -o main.o\"\n";
+                hc <<
+                        "  @phase Compile by=[0] task=\"g++ -std=c++26 -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -Werror -c main.cpp -o main.o\"\n";
                 hc << "  @phase Link to=[0] task=\"g++ *.o -o hamon\"\n";
             } else {
                 hc << _("  # Add your phases here, e.g.: @phase Step by=[*] task=\"echo hello\"\n");
@@ -186,7 +183,6 @@ int main(const int argc, char **argv) {
     for (const pid_t pid: childPids) {
         waitpid(pid, nullptr, 0);
     }
-
     std::cout << "All nodes have finished. Orchestrator shutting down." << std::endl;
     return 0;
 }

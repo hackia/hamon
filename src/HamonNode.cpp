@@ -1,4 +1,4 @@
-#include "HamonNode.hpp"
+#include "../include/HamonNode.hpp"
 #include <fstream>
 #include <sstream>
 #include <utility>
@@ -11,7 +11,7 @@
 #include <arpa/inet.h>
 #include <chrono>
 
-using namespace Dualys;
+using namespace dualys;
 using namespace std::chrono_literals;
 
 void HamonNode::initializeTopology() {

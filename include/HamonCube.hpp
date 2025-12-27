@@ -2,10 +2,14 @@
 
 #include <vector>
 #include <string>
-
 #include <chrono>
 
-namespace Dualys {
+#ifndef I18N_GETTEXT_DEFINED
+#define _(String) gettext(String)
+#define I18N_GETTEXT_DEFINED
+#endif
+
+namespace dualys {
     /**
      * @brief A vertex of the Hamon (3D) hypercube topology.
      *

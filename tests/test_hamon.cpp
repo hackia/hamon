@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 #include <algorithm>
-#include "../Hamon.hpp"
+#include "../include/Hamon.hpp"
 
-using namespace Dualys;
+using namespace dualys;
 
 namespace
 {
