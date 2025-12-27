@@ -1,5 +1,5 @@
 #pragma once
-
+#include <libintl.h>
 #include <vector>
 #include <string>
 #include <chrono>
@@ -23,7 +23,7 @@ namespace dualys {
         std::vector<int> neighbors;
     };
 
-    // Structure pour les données de configuration d'un nœud, lues depuis le YAML
+    // Structure for node configuration data read from YAML
     struct NodeConfig {
         int id;
         std::string role;

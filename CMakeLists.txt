@@ -16,9 +16,11 @@ set(GCC_WARNING_FLAGS
 find_package(Gettext REQUIRED)
 find_path(INTL_INCLUDE_DIR libintl.h PATHS /usr/local/include /usr/include)
 find_library(INTL_LIBRARY NAMES intl libintl PATHS /usr/local/lib /usr/lib)
+find_package(Intl REQUIRED)
+include_directories(${Intl_INCLUDE_DIRS})
 
 add_library(cube STATIC src/HamonCube.cpp include/HamonCube.hpp src/HamonNode.cpp include/HamonNode.hpp src/Hamon.cpp include/Hamon.hpp src/Make.cpp include/Make.hpp)
-target_compile_options(cube PRIVATE ${GCC_WARNING_FLAGS})
+target_compile_options(cube PRIVATE ${GCC_WARNING_FLAGS} ${Intl_LIBRARIES})
 
 add_executable(hamon apps/hamon/main.cpp)
 target_compile_options(hamon PRIVATE ${GCC_WARNING_FLAGS})
