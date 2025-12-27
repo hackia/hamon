@@ -1,31 +1,28 @@
-cmake_minimum_required(VERSION 3.31.6)
+cmake_minimum_required(VERSION 3.31)
 project(hamon)
 
 set(CMAKE_CXX_STANDARD 26)
-set(GCC_WARNING_FLAGS
-        -Wall
-        -Wextra
-        -Wpedantic
-        -Wshadow
-        -Wformat=2
-        -Wconversion
-        -Wsign-conversion
-        -Werror
-)
-
-find_package(Gettext REQUIRED)
-find_path(INTL_INCLUDE_DIR libintl.h PATHS /usr/local/include /usr/include)
-find_library(INTL_LIBRARY NAMES intl libintl PATHS /usr/local/lib /usr/lib)
 find_package(Intl REQUIRED)
-include_directories(${Intl_INCLUDE_DIRS})
-
-add_library(cube STATIC src/HamonCube.cpp include/HamonCube.hpp src/HamonNode.cpp include/HamonNode.hpp src/Hamon.cpp include/Hamon.hpp src/Make.cpp include/Make.hpp)
-target_compile_options(cube PRIVATE ${GCC_WARNING_FLAGS} ${Intl_LIBRARIES})
-
+set(GCC_WARNING_FLAGS
+        -Wall -Wextra -Wpedantic -Wshadow -Wformat=2
+        -Wconversion -Wsign-conversion -Werror
+)
+add_library(cube STATIC
+        src/HamonCube.cpp
+        src/HamonNode.cpp
+        src/Hamon.cpp
+        src/Make.cpp
+)
+target_link_libraries(cube PUBLIC Intl::Intl)
+target_compile_options(cube PRIVATE ${GCC_WARNING_FLAGS})
+target_include_directories(cube PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
 add_executable(hamon apps/hamon/main.cpp)
 target_compile_options(hamon PRIVATE ${GCC_WARNING_FLAGS})
-target_link_libraries(hamon cube)
-target_include_directories(hamon PRIVATE ${INTL_INCLUDE_DIR})
+target_link_libraries(hamon PRIVATE cube)
+
 install(TARGETS hamon DESTINATION bin)
 install(FILES include/HamonCube.hpp include/Make.hpp include/HamonNode.hpp include/Hamon.hpp DESTINATION include)
 install(TARGETS cube DESTINATION lib)
@@ -38,26 +35,11 @@ FetchContent_Declare(
         URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
 )
 FetchContent_MakeAvailable(googletest)
-add_executable(
-        hamon_tests
+add_executable(hamon_tests
         tests/test_hamon.cpp
         tests/test_hamon_cube.cpp
         tests/test_hamon_node.cpp
 )
-target_compile_options(hamon_tests PRIVATE ${GCC_WARNING_FLAGS})
-target_link_libraries(
-        hamon_tests
-        PRIVATE
-        cube
-        gtest_main
-)
-
+target_link_libraries(hamon_tests PRIVATE cube gtest_main)
 include(GoogleTest)
 gtest_discover_tests(hamon_tests)
-add_custom_command(
-        TARGET hamon_tests
-        POST_BUILD
-        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT "Running tests automatically after build..."
-)
