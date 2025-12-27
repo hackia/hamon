@@ -7,6 +7,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <ranges>
 #include <future>
 #include <thread>
 #include <unistd.h>
@@ -87,7 +88,7 @@ namespace dualys {
         unsigned hw = std::thread::hardware_concurrency();
         if (hw == 0) hw = 1;
         int max_numa = -1;
-        for (const auto &snd: nodes_by_id | views::values) if (snd.numa >= 0) max_numa = std::max(max_numa, snd.numa);
+        for (const auto &snd: nodes_by_id | std::views::values) if (snd.numa >= 0) max_numa = std::max(max_numa, snd.numa);
         const int numa_count = max_numa >= 0 ? max_numa + 1 : 1;
         unsigned cores_per_numa = hw / (numa_count == 0 ? 1 : static_cast<unsigned>(numa_count));
         if (cores_per_numa == 0) cores_per_numa = 1;
