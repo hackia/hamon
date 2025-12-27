@@ -1,38 +1,18 @@
-# Nom du workflow qui apparaîtra dans l'onglet "Actions" de GitHub
 name: C++ CI
-
-# Déclencheurs : quand ce workflow doit-il s'exécuter ?
 on:
-  # À chaque push sur la branche 'main'
   push:
     branches: [ "main" ]
-  # À chaque Pull Request qui cible la branche 'main'
   pull_request:
     branches: [ "main" ]
-# Les tâches (jobs) à exécuter
 jobs:
-  # On définit une seule tâche qu'on appelle "build-and-test"
   build-and-test:
-    # La machine sur laquelle la tâche va tourner (Ubuntu la plus récente)
     runs-on: ubuntu-latest
-
-    # Les étapes (steps) de notre tâche
     steps:
-      # Étape 1 : Récupérer le code de ton dépôt sur la machine virtuelle
       - name: Check out repository code
         uses: actions/checkout@v4
-
-      # Étape 2 : Configurer le projet avec CMake
-      # Crée un dossier "build" et prépare la compilation
       - name: Configure CMake
-        run: cmake -B build
-
-      # Étape 3 : Compiler le projet
-      # Lance la compilation en utilisant la configuration du dossier "build"
+        run: cmake .
       - name: Build
-        run: cmake --build build
-
-      # Étape 4 : Lancer les tests
-      # Exécute CTest dans le dossier "build". --output-on-failure est très utile.
+        run: make
       - name: Test
-        run: ctest --test-dir build --output-on-failure 
+        run: make test
